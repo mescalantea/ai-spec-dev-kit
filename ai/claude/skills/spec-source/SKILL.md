@@ -1,6 +1,6 @@
 ---
 name: spec-source
-description: Pull, adapt, push, and detect drift for specs stored in external systems (Jira, future YouTrack, etc.). Use whenever a spec command needs to sync `.sdd/specs/<id>.md` with its external source of truth.
+description: Pull, adapt, push, and detect drift for specs stored in external systems (Jira, YouTrack, etc.). Use whenever a spec command needs to sync `.sdd/specs/<id>.md` with its external source of truth.
 ---
 
 # spec-source

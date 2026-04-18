@@ -43,6 +43,34 @@ and wait.
 - `push(ref, body)`: strip frontmatter, write to temp file, run `acli jira workitem edit <ref> --description-file=<tmp>`, then overwrite `.sdd/specs/.cache/<ref>.jira.md` with the pushed body.
 - `detect_conflict(ref, cached_body)`: pull current Jira body, diff against `cached_body`. If different, require `continue` before overwrite.
 
+### `youtrack`
+
+Uses the YouTrack REST API via `curl`. Requires the `YOUTRACK_TOKEN` env var (or the name configured in `token_env`) to be set to a permanent YouTrack token. Also requires `jq` (preferred) or `python3` for JSON extraction — both must be on PATH.
+
+`base_url` must be the instance root with no trailing slash and no `/api` suffix (e.g. `https://myteam.youtrack.cloud` or `https://youtrack.example.com`).
+
+**Do not log or echo the Authorization header or token value in error messages.**
+
+On auth failure (HTTP 401/403), print:
+```
+Set $<token_env> to a valid YouTrack permanent token, then type "continue" to retry.
+```
+and wait.
+
+JSON extraction (apply to all operations that read responses):
+```bash
+# Preferred (jq):
+description=$(echo "$response" | jq -r '.description // ""')
+
+# Fallback (python3):
+description=$(echo "$response" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('description') or '')")
+```
+
+- `pull(ref)`: `curl -sS -H "Authorization: Bearer $TOKEN" "$base_url/api/issues/$ref?fields=description"`, extract `description` field. Empty or null → empty template body.
+- `adapt(body)`: same as Jira — match content against template headers; unmapped content → append under `## Original Description`; show proposal; require `continue` before writing.
+- `push(ref, body)`: if `ref` is null/empty, print `YouTrack push skipped: no source_ref set. Create the issue in YouTrack and set source_ref in frontmatter.` and stop. Otherwise: strip frontmatter, write to temp file, run `curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" "$base_url/api/issues/$ref" -d "{\"description\": $(jq -Rs . < "$tmpfile")}"`, then overwrite `.sdd/specs/.cache/<ref>.youtrack.md` with the pushed body.
+- `detect_conflict(ref, cached_body)`: pull current remote body, diff against `cached_body`. If different, require `continue` before overwrite (same logic as Jira).
+
 ## Adding an adapter
 
 1. Add a section here with the four operations.
