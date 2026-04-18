@@ -204,6 +204,31 @@ if [ "$JIRA_ENABLED" = "true" ]; then
   JIRA_WORKSPACE=$(prompt "acli workspace" "")
 fi
 
+YOUTRACK_ENABLED=$(prompt_yn "Enable YouTrack as a spec source?" "n")
+YOUTRACK_BASE_URL=""
+YOUTRACK_TOKEN_ENV="YOUTRACK_TOKEN"
+YOUTRACK_PROJECT_ID=""
+
+if [ "$YOUTRACK_ENABLED" = "true" ]; then
+  if ! command -v curl >/dev/null 2>&1; then
+    echo
+    echo "Warning: 'curl' is not on PATH. The YouTrack adapter requires curl."
+  fi
+  if ! command -v jq >/dev/null 2>&1 && ! command -v python3 >/dev/null 2>&1; then
+    echo
+    echo "Warning: neither 'jq' nor 'python3' is on PATH."
+    echo "         The YouTrack adapter needs one of them for JSON extraction."
+  fi
+  YOUTRACK_BASE_URL=$(prompt "YouTrack base URL (e.g. https://myteam.youtrack.cloud — no trailing slash, no /api)" "")
+  YOUTRACK_TOKEN_ENV=$(prompt "Env var holding your YouTrack permanent token" "YOUTRACK_TOKEN")
+  if [ -n "$YOUTRACK_TOKEN_ENV" ] && [ -z "$(eval echo "\${${YOUTRACK_TOKEN_ENV}:-}")" ]; then
+    echo
+    echo "Warning: \$$YOUTRACK_TOKEN_ENV is not set in the current shell."
+    echo "         Set it before running /spec-draft or /spec-build with source: youtrack."
+  fi
+  YOUTRACK_PROJECT_ID=$(prompt "YouTrack project ID (optional, for future create-on-push)" "")
+fi
+
 echo
 echo "Version control"
 echo "---------------"
@@ -250,6 +275,12 @@ cat > "$DST_CONFIG" <<EOF
       "enabled": $JIRA_ENABLED,
       "project_key": "$JIRA_PROJECT_KEY",
       "workspace": "$JIRA_WORKSPACE"
+    },
+    "youtrack": {
+      "enabled": $YOUTRACK_ENABLED,
+      "base_url": "$YOUTRACK_BASE_URL",
+      "token_env": "$YOUTRACK_TOKEN_ENV",
+      "project_id": "$YOUTRACK_PROJECT_ID"
     }
   }
 }
@@ -276,8 +307,9 @@ Done.
 
 Claude attribution: $CLAUDE_ATTRIBUTION
 Enabled sources:
-  local: true
-  jira:  $JIRA_ENABLED
+  local:     true
+  jira:      $JIRA_ENABLED
+  youtrack:  $YOUTRACK_ENABLED
 EOF
 
 if [ "$JIRA_ENABLED" = "true" ]; then
@@ -286,6 +318,15 @@ if [ "$JIRA_ENABLED" = "true" ]; then
     workspace:   $JIRA_WORKSPACE
 
   Make sure you have run:   acli auth login
+EOF
+fi
+
+if [ "$YOUTRACK_ENABLED" = "true" ]; then
+  cat <<EOF
+    base_url:  $YOUTRACK_BASE_URL
+    token_env: $YOUTRACK_TOKEN_ENV
+
+  Make sure \$$YOUTRACK_TOKEN_ENV is set to a valid YouTrack permanent token.
 EOF
 fi
 
