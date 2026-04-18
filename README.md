@@ -196,6 +196,36 @@ your-project/
 
 ---
 
+## 🔔 Auto-Update Check
+
+The setup wizard offers to add an update check hook to your shell profile. When a new terminal session opens, the hook silently checks whether the upstream repository has a newer commit. If one is found, it prints a one-line notification and asks for confirmation before applying anything.
+
+The check:
+- runs at most once per 24 hours (cooldown stored in `~/.sdd/.last_update_check`)
+- times out after 5 seconds if the network is unavailable, and fails silently
+- only prompts when your local commit differs from the remote HEAD
+- applies the update with `git pull` in your toolkit clone — target projects are not touched
+
+### Manual installation
+
+If you declined the wizard prompt or want to add the hook yourself:
+
+**zsh** — add to `~/.zshrc`:
+
+```zsh
+[ -x "/path/to/ai-spec-dev-kit/scripts/check-update.sh" ] && "/path/to/ai-spec-dev-kit/scripts/check-update.sh"
+```
+
+**bash** — add to `~/.bash_profile`:
+
+```bash
+[ -x "/path/to/ai-spec-dev-kit/scripts/check-update.sh" ] && "/path/to/ai-spec-dev-kit/scripts/check-update.sh"
+```
+
+Replace `/path/to/ai-spec-dev-kit` with the absolute path to your clone. The wizard injects this line automatically with the correct path when you answer **y** to the prompt.
+
+---
+
 ## 🙏 Credits & attribution
 
 The `spec-caveman` skill is adapted from **Julius Brussee's `caveman`** project:
