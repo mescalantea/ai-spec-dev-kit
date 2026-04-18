@@ -16,7 +16,7 @@ The toolkit enforces the split by shipping four distinct slash commands, one per
 
 ## 📦 What's included
 
-- **Spec template** — Markdown template with YAML frontmatter (`.specs/template/spec.md`). Covers Context, Summary, Functional Requirements, Non-Goals, Edge Cases, Acceptance Criteria, Open Questions, Dependencies, Success Metrics, Testing Guidelines.
+- **Spec template** — Markdown template with YAML frontmatter (`.sdd/specs/template/spec.md`). Covers Context, Summary, Functional Requirements, Non-Goals, Edge Cases, Acceptance Criteria, Open Questions, Dependencies, Success Metrics, Testing Guidelines.
 - **Four slash commands** for Claude Code — `/spec-draft`, `/spec-plan`, `/spec-build`, `/spec-status`.
 - **`spec-source` skill** — reusable pull / adapt / push / conflict-detection across spec backends (`local`, `jira`, extensible to YouTrack / Linear / GitHub Issues).
 - **`spec-caveman` skill** — terse-response style that auto-activates inside SDD commands to cut token usage without losing technical substance. Commits and PRs are never compressed.
@@ -28,7 +28,7 @@ The toolkit enforces the split by shipping four distinct slash commands, one per
 
 ## 🧠 Goals
 
-- Make specs the **single source of truth**, whether they live in the repo (`.specs/<id>.md`) or an external system (Jira today, more adapters later). Either way, the local Markdown file is the canonical working copy.
+- Make specs the **single source of truth**, whether they live in the repo (`.sdd/specs/<id>.md`) or an external system (Jira today, more adapters later). Either way, the local Markdown file is the canonical working copy.
 - Enforce a **multi-step flow with human review** — draft, plan, build — so AI never jumps straight to code.
 - Support **non-linear iteration** — each phase can be re-entered as requirements shift, preserving history and marking obsolete steps instead of deleting them.
 - Stay **agent-neutral where it matters** — sources, config, and template live outside `.claude/` so other agents can plug in later.
@@ -76,11 +76,12 @@ The wizard:
 - copies `/spec-*` slash commands into `.claude/commands/`
 - copies the `spec-source` and `spec-caveman` skills into `.claude/skills/`
 - creates `.sdd/` with `sources.md` and `config.json`
-- copies the spec template into `.specs/template/spec.md`
-- creates `.specs/.cache/` and adds it to `.gitignore`
+- copies the spec template into `.sdd/specs/template/spec.md`
+- creates `.sdd/specs/.cache/` and adds it to `.gitignore`
 - asks whether to enable Jira; if yes, collects the project key and `acli` workspace
+- asks whether to gitignore the toolkit directories (`.sdd/`, `.claude/commands/`, `.claude/skills/`) — default no (commit by default)
 
-Re-run any time to reinitialize — existing files are overwritten. `.specs/<id>.md` files and `.specs/.cache/` contents are left untouched.
+Re-run any time to reinitialize — existing files are overwritten. `.sdd/specs/<id>.md` files and `.sdd/specs/.cache/` contents are left untouched.
 
 ---
 
@@ -105,7 +106,7 @@ All commands are invoked inside Claude Code:
 /spec-build PAR-224
 ```
 
-`/spec-draft` creates the feature branch, pulls the description from the source (Jira, or an empty template for `local`), and writes `.specs/PAR-224.md`. `/spec-plan` analyzes the codebase, asks you to resolve open questions, and appends an Implementation Plan. `/spec-build` walks the plan step by step, pausing after each so you can review before it commits.
+`/spec-draft` creates the feature branch, pulls the description from the source (Jira, or an empty template for `local`), and writes `.sdd/specs/PAR-224.md`. `/spec-plan` analyzes the codebase, asks you to resolve open questions, and appends an Implementation Plan. `/spec-build` walks the plan step by step, pausing after each so you can review before it commits.
 
 ### Non-linear iteration
 
@@ -130,10 +131,10 @@ Specs can come from multiple backends. Each backend implements a simple four-ope
 
 | Source | Requires | Notes |
 |---|---|---|
-| `local` | nothing | Default. The Markdown file under `.specs/` IS the source of truth. |
+| `local` | nothing | Default. The Markdown file under `.sdd/specs/` IS the source of truth. |
 | `jira` | Atlassian CLI (`acli`) + prior `acli auth login` | `/spec-draft` pulls the description, adapts it to the template (asking you to review), and caches it. `/spec-plan` and `/spec-build` push the updated body back at the end, after detecting any external drift and asking for confirmation. |
 
-Conflict detection uses a cache at `.specs/.cache/<spec_id>.<source>.md` (gitignored). If the remote has drifted since the last sync, you're shown a diff and asked to type `continue` before any overwrite.
+Conflict detection uses a cache at `.sdd/specs/.cache/<spec_id>.<source>.md` (gitignored). If the remote has drifted since the last sync, you're shown a diff and asked to type `continue` before any overwrite.
 
 ### Adding a new source
 
@@ -175,13 +176,13 @@ your-project/
 │   └── skills/
 │       ├── spec-source/
 │       └── spec-caveman/
-├── .sdd/
-│   ├── config.json             # Wizard-generated source config
-│   └── sources.md              # Adapter catalog
-└── .specs/
-    ├── template/spec.md        # Spec template
-    ├── .cache/                 # Last-known remote state (gitignored)
-    └── <SPEC-ID>.md            # One file per spec
+└── .sdd/
+    ├── config.json             # Wizard-generated source config
+    ├── sources.md              # Adapter catalog
+    └── specs/
+        ├── template/spec.md    # Spec template
+        ├── .cache/             # Last-known remote state (gitignored)
+        └── <SPEC-ID>.md        # One file per spec
 ```
 
 ---
@@ -190,7 +191,8 @@ your-project/
 
 - **Toolkit update** — `git pull` in your clone of this repo, then re-run `spec-init` in each target project. Existing commands, skills, template, and `sources.md` are overwritten; your specs and config are not.
 - **Reset a single project** — delete `.claude/commands/spec-*.md`, `.claude/skills/spec-*/`, `.sdd/`, then re-run `spec-init`.
-- **Move off the toolkit** — `.specs/` is just Markdown; it keeps working without the commands.
+- **Move off the toolkit** — `.sdd/specs/` is just Markdown; it keeps working without the commands.
+- **Legacy `.specs/` directory** — if you have spec files from an older install under `.specs/`, the wizard leaves them untouched. Move them to `.sdd/specs/` manually after reinitializing.
 
 ---
 
