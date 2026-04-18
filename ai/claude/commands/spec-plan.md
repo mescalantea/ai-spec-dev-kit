@@ -21,7 +21,7 @@ User input: $ARGUMENTS
 
 ### 2. Load spec
 
-Read `.specs/<spec_id>.md`. Missing → tell user to run `/spec-draft <spec_id> ...` and stop.
+Read `.sdd/specs/<spec_id>.md`. Missing → tell user to run `/spec-draft <spec_id> ...` and stop.
 
 Parse YAML frontmatter. Remember `source`, `source_ref`.
 
@@ -116,7 +116,7 @@ Plan rules (both modes):
 
 Otherwise, invoke `spec-source`:
 
-1. `push(source, source_ref, body_of(.specs/<spec_id>.md))`.
+1. `push(source, source_ref, body_of(.sdd/specs/<spec_id>.md))`.
 2. Skill handles drift detection, user confirmation, frontmatter stripping, and cache update.
 3. Capture result: `pushed | aborted by user | skipped (conflict unresolved)`.
 
