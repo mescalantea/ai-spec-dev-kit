@@ -134,6 +134,21 @@ ensure_gitignore_line() {
   fi
 }
 
+ensure_profile_line() {
+  profile="$1"
+  line="$2"
+  if [ ! -f "$profile" ]; then
+    printf '%s\n' "$line" > "$profile"
+    return
+  fi
+  if ! grep -Fxq "$line" "$profile"; then
+    if [ -s "$profile" ] && [ "$(tail -c 1 "$profile" | wc -l)" -eq 0 ]; then
+      printf '\n' >> "$profile"
+    fi
+    printf '%s\n' "$line" >> "$profile"
+  fi
+}
+
 copy_dir_contents() {
   src="$1"
   dst="$2"
@@ -204,6 +219,21 @@ if [ "$JIRA_ENABLED" = "true" ]; then
 fi
 
 echo
+echo "Auto-update check"
+echo "-----------------"
+echo "The toolkit can check for updates each time you open a new terminal session."
+echo "It runs silently in the background and only prompts when an update is available."
+
+case "$SHELL" in
+  */zsh)  SHELL_PROFILE="$HOME/.zshrc" ;;
+  */bash) SHELL_PROFILE="$HOME/.bash_profile" ;;
+  *)      SHELL_PROFILE="$HOME/.zshrc" ;;
+esac
+
+HOOK_LINE="[ -x \"$REPO_ROOT/scripts/check-update.sh\" ] && \"$REPO_ROOT/scripts/check-update.sh\""
+INSTALL_HOOK=$(prompt_yn "Add update check hook to $SHELL_PROFILE?" "y")
+
+echo
 echo "Version control"
 echo "---------------"
 echo "The toolkit directories can be kept local-only (gitignored) or committed."
@@ -262,6 +292,15 @@ if [ "$GITIGNORE_TOOLKIT" = "true" ]; then
   ensure_gitignore_line ".claude/skills/"
 fi
 echo "  updated $DST_GITIGNORE"
+
+if [ "$INSTALL_HOOK" = "true" ]; then
+  ensure_profile_line "$SHELL_PROFILE" "$HOOK_LINE"
+  echo "  added update check hook to $SHELL_PROFILE"
+else
+  echo
+  echo "To enable update checks manually, add this line to your shell profile:"
+  echo "  $HOOK_LINE"
+fi
 
 # ---------------------------------------------------------------------------
 # Summary.
