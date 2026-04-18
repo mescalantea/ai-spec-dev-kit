@@ -47,8 +47,8 @@ DST_SKILLS="$DST_CLAUDE/skills"
 DST_SDD="$TARGET_DIR/.sdd"
 DST_SOURCES_DOC="$DST_SDD/sources.md"
 DST_CONFIG="$DST_SDD/config.json"
-DST_TEMPLATE_DIR="$TARGET_DIR/.specs/template"
-DST_CACHE_DIR="$TARGET_DIR/.specs/.cache"
+DST_TEMPLATE_DIR="$TARGET_DIR/.sdd/specs/template"
+DST_CACHE_DIR="$TARGET_DIR/.sdd/specs/.cache"
 DST_GITIGNORE="$TARGET_DIR/.gitignore"
 
 # ---------------------------------------------------------------------------
@@ -160,9 +160,9 @@ This will:
   • copy slash commands into .claude/commands/
   • copy skills into .claude/skills/
   • create .sdd/ with sources.md and config.json
-  • copy the spec template into .specs/template/
-  • create .specs/.cache/ for source sync state
-  • add .specs/.cache/ to .gitignore
+  • copy the spec template into .sdd/specs/template/
+  • create .sdd/specs/.cache/ for source sync state
+  • add .sdd/specs/.cache/ to .gitignore
 
 Existing files will be overwritten.
 ────────────────────────────────────────────────────
@@ -230,7 +230,7 @@ cat > "$DST_CONFIG" <<EOF
   "sources": {
     "local": {
       "enabled": true,
-      "path": ".specs"
+      "path": ".sdd/specs"
     },
     "jira": {
       "enabled": $JIRA_ENABLED,
