@@ -62,6 +62,23 @@ Present:
 2. Technical decisions with multiple valid approaches — describe options, ask user to choose.
 3. Risks needing user input.
 
+**Option suggestions:** For each open question or decision where options can be reasonably inferred, propose 2–4 candidate answers and mark one as the default. Use this format:
+
+```
+Q: <question text>
+  ★ (a) <option> — <one-line reason>  ← default
+    (b) <option> — <one-line reason>
+    (c) <option> — <one-line reason>
+```
+
+Infer options using this source-of-truth order:
+1. Spec body (existing constraints or examples).
+2. Codebase (closest analogous pattern already implemented).
+3. Prior specs / `CLAUDE.md` (established conventions).
+4. Generic defaults (common industry practice).
+
+When no options are reasonably inferable from any of the above, ask the question open-ended without fabricated options.
+
 **STOP and wait for answers.** Do not proceed until user responds.
 
 ### 7. Write/refresh spec sections
