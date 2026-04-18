@@ -54,7 +54,12 @@ Type any feedback to request changes before committing.
 
 - `continue` → go to step 6.
 - `abort` → stop immediately, do not commit, print how many steps remain.
-- Anything else → treat as feedback. Apply changes, re-show the pause prompt (step 4). Loop until `continue` or `abort`.
+- Anything else → treat as feedback:
+  1. Apply the requested changes.
+  2. Re-display the §4 pause prompt **byte-identical** to the first display (same wording, same border lines, updated "Files changed" and "Summary" if the changes affected them).
+  3. Wait for user response. Loop indefinitely until `continue` or `abort`.
+
+  The prompt re-display is mandatory after every feedback round, regardless of how many iterations the loop has run.
 
 ### 6. Commit and mark done
 
