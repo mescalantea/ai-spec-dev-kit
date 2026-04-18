@@ -73,6 +73,18 @@ Type any feedback to request changes before committing.
 
 Back to step 2. Repeat until done.
 
+### 7a. CLAUDE.md update
+
+Runs once, after all steps are checked/superseded, **only if at least one step was committed in this run.**
+
+1. Assess whether the completed build introduced behaviors, invariants, commands, or architectural facts that belong in the target's `CLAUDE.md`.
+2. If `CLAUDE.md` is absent in the project root → skip entirely.
+3. If no CLAUDE.md-worthy changes were introduced → skip entirely (do not create a no-op commit).
+4. Otherwise:
+   - Edit `CLAUDE.md` to reflect the new facts (new commands, changed invariants, updated tail behaviors, etc.).
+   - Commit: `<spec_id>: update CLAUDE.md with new behaviors`
+5. Then proceed to §8.
+
 ### 8. Completion
 
 All checked or superseded:
