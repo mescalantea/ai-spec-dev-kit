@@ -247,7 +247,7 @@ cat > "$DST_CONFIG" <<EOF
 EOF
 echo "  wrote $DST_CONFIG"
 
-ensure_gitignore_line ".specs/.cache/"
+ensure_gitignore_line ".sdd/specs/.cache/"
 echo "  updated $DST_GITIGNORE"
 
 # ---------------------------------------------------------------------------
