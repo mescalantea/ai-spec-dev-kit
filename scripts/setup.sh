@@ -191,6 +191,7 @@ echo "--------------------"
 JIRA_ENABLED=$(prompt_yn "Enable Jira as a spec source?" "n")
 JIRA_PROJECT_KEY=""
 JIRA_WORKSPACE=""
+CLAUDE_ATTRIBUTION=$(prompt_yn "Include Claude as a co-author in commits and PR bodies?" "y")
 
 if [ "$JIRA_ENABLED" = "true" ]; then
   if ! command -v acli >/dev/null 2>&1; then
@@ -239,6 +240,7 @@ echo "  wrote $DST_TEMPLATE_DIR/spec.md"
 # Config.
 cat > "$DST_CONFIG" <<EOF
 {
+  "claude_attribution": $CLAUDE_ATTRIBUTION,
   "sources": {
     "local": {
       "enabled": true,
@@ -272,6 +274,7 @@ cat <<EOF
 ────────────────────────────────────────────────────
 Done.
 
+Claude attribution: $CLAUDE_ATTRIBUTION
 Enabled sources:
   local: true
   jira:  $JIRA_ENABLED
