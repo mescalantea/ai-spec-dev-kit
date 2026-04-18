@@ -18,6 +18,8 @@ User input: $ARGUMENTS
 
 Read `.sdd/specs/<spec_id>.md`. Parse frontmatter (`source`, `source_ref`). Body must contain an `## Implementation Plan` section with checkboxes. Missing → tell user to run `/spec-plan <spec_id>` first and stop.
 
+Read `.sdd/config.json`. Extract `claude_attribution` (top-level boolean field). If the field is absent, non-boolean, or `config.json` is missing, default to `true`. Store as `CLAUDE_ATTRIBUTION` for use in §6 and §8.
+
 ### 2. Find next step
 
 First unchecked step (`- [ ]`). Superseded steps (`- [x] ~~...~~ _(superseded: ...)_`) count as done — skip. All checked or superseded → go to **Completion**.
@@ -65,6 +67,8 @@ Type any feedback to request changes before committing.
 
 1. `git add -A`
 2. Commit: `<spec_id>: step N - <short step description>`
+   - If `CLAUDE_ATTRIBUTION` is `true`: include a `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` trailer in the commit message body.
+   - If `CLAUDE_ATTRIBUTION` is `false`: do **not** append any `Co-Authored-By` trailer. Pass the full commit message explicitly and do not add attribution.
 3. Update spec: change `- [ ] Step N:` to `- [x] Step N:` for the completed step.
 4. `git add .sdd/specs/<spec_id>.md && git commit --amend --no-edit`
 5. Print: `✓ Step N committed. Moving to next step...`
@@ -125,6 +129,7 @@ All checked or superseded:
 
         🤖 Generated with [Claude Code](https://claude.com/claude-code)
         ```
+        If `CLAUDE_ATTRIBUTION` is `false`, omit the `🤖 Generated with [Claude Code](https://claude.com/claude-code)` line.
      4. On `gh` success print the PR URL.
      5. On `gh` failure (not installed, not authenticated, etc.): keep the push, print the error verbatim, and print the equivalent manual command the user can run.
 
