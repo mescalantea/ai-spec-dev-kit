@@ -125,6 +125,11 @@ ensure_gitignore_line() {
     return
   fi
   if ! grep -Fxq "$line" "$DST_GITIGNORE"; then
+    # Guard: if file is non-empty and last byte is not \n, add one.
+    # tail -c 1 | wc -l returns 1 when last byte is \n, 0 for any other byte.
+    if [ -s "$DST_GITIGNORE" ] && [ "$(tail -c 1 "$DST_GITIGNORE" | wc -l)" -eq 0 ]; then
+      printf '\n' >> "$DST_GITIGNORE"
+    fi
     printf '%s\n' "$line" >> "$DST_GITIGNORE"
   fi
 }
