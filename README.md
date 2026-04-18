@@ -62,7 +62,15 @@ cd ai-spec-dev-kit
 
 The script symlinks `scripts/setup.sh` into the first writable directory it finds on your PATH (`$HOME/.local/bin`, `/usr/local/bin`, or `/opt/homebrew/bin`). After this you can run `spec-init` from any project root.
 
-### 3. Initialize the toolkit in your target project
+### 3. (Optional) Enable auto-update checks on terminal open
+
+```bash
+./scripts/install-hook.sh
+```
+
+The script detects your shell (`$SHELL`), resolves the right profile (`~/.zshrc` for zsh, `~/.bash_profile` for bash), and appends a one-line hook. Safe to re-run — the line is injected only once. See [Auto-Update Check](#-auto-update-check) for details.
+
+### 4. Initialize the toolkit in your target project
 
 ```bash
 cd /path/to/your/project
@@ -161,7 +169,9 @@ No command or skill changes needed — the skill reads the catalog at runtime.
 │   └── spec.md                 # Spec template with YAML frontmatter
 ├── scripts/
 │   ├── setup.sh                # Wizard invoked by `spec-init`
-│   └── install-global.sh       # Symlinks setup.sh as `spec-init`
+│   ├── install-global.sh       # Symlinks setup.sh as `spec-init`
+│   ├── install-hook.sh         # Injects auto-update hook into shell profile
+│   └── check-update.sh         # Auto-update check run by the shell hook
 ├── CLAUDE.md
 ├── LICENSE
 └── README.md
@@ -198,7 +208,7 @@ your-project/
 
 ## 🔔 Auto-Update Check
 
-The setup wizard offers to add an update check hook to your shell profile. When a new terminal session opens, the hook silently checks whether the upstream repository has a newer commit. If one is found, it prints a one-line notification and asks for confirmation before applying anything.
+Run `scripts/install-hook.sh` once after cloning (see [Install step 3](#3-optional-enable-auto-update-checks-on-terminal-open)). When a new terminal session opens, the hook silently checks whether the upstream repository has a newer commit. If one is found, it prints a one-line notification and asks for confirmation before applying anything.
 
 The check:
 - runs at most once per 24 hours (cooldown stored in `~/.sdd/.last_update_check`)
@@ -208,7 +218,7 @@ The check:
 
 ### Manual installation
 
-If you declined the wizard prompt or want to add the hook yourself:
+If you prefer to add the hook line yourself rather than running `install-hook.sh`:
 
 **zsh** — add to `~/.zshrc`:
 
@@ -222,7 +232,7 @@ If you declined the wizard prompt or want to add the hook yourself:
 [ -x "/path/to/ai-spec-dev-kit/scripts/check-update.sh" ] && "/path/to/ai-spec-dev-kit/scripts/check-update.sh"
 ```
 
-Replace `/path/to/ai-spec-dev-kit` with the absolute path to your clone. The wizard injects this line automatically with the correct path when you answer **y** to the prompt.
+Replace `/path/to/ai-spec-dev-kit` with the absolute path to your clone.
 
 ---
 
