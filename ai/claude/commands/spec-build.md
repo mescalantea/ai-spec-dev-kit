@@ -16,7 +16,7 @@ User input: $ARGUMENTS
 
 ### 1. Load and validate
 
-Read `.specs/<spec_id>.md`. Parse frontmatter (`source`, `source_ref`). Body must contain an `## Implementation Plan` section with checkboxes. Missing → tell user to run `/spec-plan <spec_id>` first and stop.
+Read `.sdd/specs/<spec_id>.md`. Parse frontmatter (`source`, `source_ref`). Body must contain an `## Implementation Plan` section with checkboxes. Missing → tell user to run `/spec-plan <spec_id>` first and stop.
 
 ### 2. Find next step
 
@@ -61,7 +61,7 @@ Type any feedback to request changes before committing.
 1. `git add -A`
 2. Commit: `<spec_id>: step N - <short step description>`
 3. Update spec: change `- [ ] Step N:` to `- [x] Step N:` for the completed step.
-4. `git add .specs/<spec_id>.md && git commit --amend --no-edit`
+4. `git add .sdd/specs/<spec_id>.md && git commit --amend --no-edit`
 5. Print: `✓ Step N committed. Moving to next step...`
 
 ### 7. Loop
@@ -73,7 +73,7 @@ Back to step 2. Repeat until done.
 All checked or superseded:
 
 1. Sync to source. `source == "local"` → skip. Otherwise invoke `spec-source`:
-   - `push(source, source_ref, body_of(.specs/<spec_id>.md))`.
+   - `push(source, source_ref, body_of(.sdd/specs/<spec_id>.md))`.
    - Skill handles drift detection, user confirmation, frontmatter stripping, cache update.
    - Capture result: `pushed | aborted by user | skipped (conflict unresolved)`.
 
