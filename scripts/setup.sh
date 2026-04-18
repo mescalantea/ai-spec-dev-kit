@@ -168,6 +168,7 @@ This will:
   • copy the spec template into .sdd/specs/template/
   • create .sdd/specs/.cache/ for source sync state
   • add .sdd/specs/.cache/ to .gitignore
+  • (optional) gitignore .sdd/, .claude/commands/, .claude/skills/
 
 Existing files will be overwritten.
 ────────────────────────────────────────────────────
@@ -201,6 +202,12 @@ if [ "$JIRA_ENABLED" = "true" ]; then
   JIRA_PROJECT_KEY=$(prompt "Default Jira project key (e.g. PAR)" "")
   JIRA_WORKSPACE=$(prompt "acli workspace" "")
 fi
+
+echo
+echo "Version control"
+echo "---------------"
+echo "The toolkit directories can be kept local-only (gitignored) or committed."
+GITIGNORE_TOOLKIT=$(prompt_yn "Exclude toolkit from version control (.sdd/, .claude/commands/, .claude/skills/)?" "n")
 
 # ---------------------------------------------------------------------------
 # Apply.
@@ -248,6 +255,12 @@ EOF
 echo "  wrote $DST_CONFIG"
 
 ensure_gitignore_line ".sdd/specs/.cache/"
+
+if [ "$GITIGNORE_TOOLKIT" = "true" ]; then
+  ensure_gitignore_line ".sdd/"
+  ensure_gitignore_line ".claude/commands/"
+  ensure_gitignore_line ".claude/skills/"
+fi
 echo "  updated $DST_GITIGNORE"
 
 # ---------------------------------------------------------------------------
