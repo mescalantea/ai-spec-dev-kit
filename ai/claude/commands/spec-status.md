@@ -19,13 +19,13 @@ User input: $ARGUMENTS
 
 ### 2. Locate specs
 
-- Single: read `.specs/<spec_id>.md`. Missing → print:
+- Single: read `.sdd/specs/<spec_id>.md`. Missing → print:
   ```
-  No spec found at .specs/<spec_id>.md
+  No spec found at .sdd/specs/<spec_id>.md
   Run: /spec-draft <spec_id> <type> <title>
   ```
   and stop.
-- List: glob `.specs/*.md`, exclude `.specs/template/` and `.specs/.cache/`.
+- List: glob `.sdd/specs/*.md`, exclude `.sdd/specs/template/` and `.sdd/specs/.cache/`.
 
 ### 3. Derive state per spec
 
@@ -47,7 +47,7 @@ Counts when plan exists:
 - `pending` — `- [ ]`.
 
 Source sync hints (no remote calls):
-- Non-local source + cache exists at `.specs/.cache/<spec_id>.<source>.md` → `last_sync = mtime`.
+- Non-local source + cache exists at `.sdd/specs/.cache/<spec_id>.<source>.md` → `last_sync = mtime`.
 - Non-local source + cache missing → `last_sync: never`.
 
 Branch hint: run `git branch --show-current` once. Per spec: compare frontmatter `branch` to current; mark `on_branch: yes|no`.

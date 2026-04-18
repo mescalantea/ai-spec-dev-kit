@@ -31,7 +31,7 @@ If any field cannot be inferred, ask the user — do not guess.
 
 ### 2. Detect re-entry
 
-Check whether `.specs/<spec_id>.md` exists.
+Check whether `.sdd/specs/<spec_id>.md` exists.
 
 - **Exists** → refresh mode. Skip branch creation. Refresh body and commit as a standalone commit.
 - **Missing** → new draft mode. Do dirty tree check and create branch.
@@ -41,7 +41,7 @@ Check whether `.specs/<spec_id>.md` exists.
 Run `git status --porcelain`.
 
 - New draft: non-empty → abort, ask user to commit or stash.
-- Refresh: anything other than `.specs/<spec_id>.md` → abort.
+- Refresh: anything other than `.sdd/specs/<spec_id>.md` → abort.
 
 ### 4. Choose source
 
@@ -58,7 +58,7 @@ Invoke `spec-source`:
 
 1. `pull(source, source_ref)` → raw body.
 2. `adapt(source, body)` → proposed body (user must `continue` to accept).
-3. Skill writes `.specs/.cache/<source_ref>.<source>.md` on success.
+3. Skill writes `.sdd/specs/.cache/<source_ref>.<source>.md` on success.
 
 ### 6. Create branch (new draft only)
 
@@ -66,7 +66,7 @@ Skip in refresh mode. Switch to a new branch from HEAD using `branch_name`. If t
 
 ### 7. Write spec file
 
-Read `.specs/template/spec.md`. Create `.specs/<spec_id>.md` with:
+Read `.sdd/specs/template/spec.md`. Create `.sdd/specs/<spec_id>.md` with:
 
 - Frontmatter:
   ```yaml
@@ -91,7 +91,7 @@ No implementation details, code examples, or file paths — product-level docume
 Refresh mode, after writing:
 
 ```
-git add .specs/<spec_id>.md .specs/.cache/<spec_id>.<source>.md 2>/dev/null
+git add .sdd/specs/<spec_id>.md .sdd/specs/.cache/<spec_id>.<source>.md 2>/dev/null
 git commit -m "<spec_id>: refresh spec from <source>"
 ```
 
@@ -102,7 +102,7 @@ New draft: leave uncommitted — user commits after review.
 Print exactly:
 
 ```
-Spec:    .specs/<spec_id>.md
+Spec:    .sdd/specs/<spec_id>.md
 Branch:  <branch_name>
 Title:   <spec_title>
 Source:  <source>[:<source_ref>]

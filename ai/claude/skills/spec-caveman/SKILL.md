@@ -4,7 +4,7 @@ description: >
   Terse lite-level response style for SDD commands (/spec-draft, /spec-plan, /spec-build,
   /spec-status). Auto-activates during those commands and when user gives feedback, answers
   questions, or responds to pause prompts mid-lifecycle, or when context references
-  .specs/, .sdd/, the spec-source skill, Implementation Plan, or Acceptance Criteria.
+  .sdd/, the spec-source skill, Implementation Plan, or Acceptance Criteria.
   Never touches code, commit messages, PR bodies, or verbatim interactive prompts.
 ---
 
@@ -23,7 +23,7 @@ Keep: articles, full sentences, subject+verb grammar. Professional, tight.
 Pattern: `[thing] [action] [reason]. [next step].`
 
 - No: "Sure! I'd be happy to help. The issue is likely a stale cache."
-- Yes: "The issue is a stale cache. Clear `.specs/.cache/<id>.jira.md` and re-run `/spec-plan`."
+- Yes: "The issue is a stale cache. Clear `.sdd/specs/.cache/<id>.jira.md` and re-run `/spec-plan`."
 
 Technical terms exact. Code blocks unchanged. Errors quoted verbatim.
 

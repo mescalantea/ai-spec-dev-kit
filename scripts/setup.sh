@@ -47,8 +47,8 @@ DST_SKILLS="$DST_CLAUDE/skills"
 DST_SDD="$TARGET_DIR/.sdd"
 DST_SOURCES_DOC="$DST_SDD/sources.md"
 DST_CONFIG="$DST_SDD/config.json"
-DST_TEMPLATE_DIR="$TARGET_DIR/.specs/template"
-DST_CACHE_DIR="$TARGET_DIR/.specs/.cache"
+DST_TEMPLATE_DIR="$TARGET_DIR/.sdd/specs/template"
+DST_CACHE_DIR="$TARGET_DIR/.sdd/specs/.cache"
 DST_GITIGNORE="$TARGET_DIR/.gitignore"
 
 # ---------------------------------------------------------------------------
@@ -125,6 +125,11 @@ ensure_gitignore_line() {
     return
   fi
   if ! grep -Fxq "$line" "$DST_GITIGNORE"; then
+    # Guard: if file is non-empty and last byte is not \n, add one.
+    # tail -c 1 | wc -l returns 1 when last byte is \n, 0 for any other byte.
+    if [ -s "$DST_GITIGNORE" ] && [ "$(tail -c 1 "$DST_GITIGNORE" | wc -l)" -eq 0 ]; then
+      printf '\n' >> "$DST_GITIGNORE"
+    fi
     printf '%s\n' "$line" >> "$DST_GITIGNORE"
   fi
 }
@@ -160,9 +165,10 @@ This will:
   • copy slash commands into .claude/commands/
   • copy skills into .claude/skills/
   • create .sdd/ with sources.md and config.json
-  • copy the spec template into .specs/template/
-  • create .specs/.cache/ for source sync state
-  • add .specs/.cache/ to .gitignore
+  • copy the spec template into .sdd/specs/template/
+  • create .sdd/specs/.cache/ for source sync state
+  • add .sdd/specs/.cache/ to .gitignore
+  • (optional) gitignore .sdd/, .claude/commands/, .claude/skills/
 
 Existing files will be overwritten.
 ────────────────────────────────────────────────────
@@ -197,6 +203,12 @@ if [ "$JIRA_ENABLED" = "true" ]; then
   JIRA_WORKSPACE=$(prompt "acli workspace" "")
 fi
 
+echo
+echo "Version control"
+echo "---------------"
+echo "The toolkit directories can be kept local-only (gitignored) or committed."
+GITIGNORE_TOOLKIT=$(prompt_yn "Exclude toolkit from version control (.sdd/, .claude/commands/, .claude/skills/)?" "n")
+
 # ---------------------------------------------------------------------------
 # Apply.
 # ---------------------------------------------------------------------------
@@ -230,7 +242,7 @@ cat > "$DST_CONFIG" <<EOF
   "sources": {
     "local": {
       "enabled": true,
-      "path": ".specs"
+      "path": ".sdd/specs"
     },
     "jira": {
       "enabled": $JIRA_ENABLED,
@@ -242,7 +254,13 @@ cat > "$DST_CONFIG" <<EOF
 EOF
 echo "  wrote $DST_CONFIG"
 
-ensure_gitignore_line ".specs/.cache/"
+ensure_gitignore_line ".sdd/specs/.cache/"
+
+if [ "$GITIGNORE_TOOLKIT" = "true" ]; then
+  ensure_gitignore_line ".sdd/"
+  ensure_gitignore_line ".claude/commands/"
+  ensure_gitignore_line ".claude/skills/"
+fi
 echo "  updated $DST_GITIGNORE"
 
 # ---------------------------------------------------------------------------
