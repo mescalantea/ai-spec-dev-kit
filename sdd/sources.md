@@ -60,8 +60,8 @@ and wait.
      | `~~strikethrough~~` | `-strikethrough-` |
      | `> blockquote` (consecutive lines) | `{quote}\n…\n{quote}` |
      | `---` (horizontal rule, standalone line) | `----` |
-     | `- [ ] item` | `* (x) item` |
-     | `- [x] item` | `* (/) item` |
+     | `- [ ] item` | `* [] item` |
+     | `- [x] item` | `* [x] item` |
      | `- item` (unordered list) | `* item` |
      | `  - nested` (2-space indent) | `** nested` |
      | `1. item` (ordered list) | `# item` |
