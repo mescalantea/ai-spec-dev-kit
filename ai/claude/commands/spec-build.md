@@ -120,19 +120,44 @@ All checked or superseded:
    - `push + PR`:
      1. Run `git push -u origin <branch>`. On push failure print the error verbatim and proceed to step 3 (do not attempt PR).
      2. Check whether an open PR already tracks this branch: `gh pr list --head <branch> --state open --json number,url`.
-        - Open PR found → run `gh pr edit <number> --body "<auto-body>"`.
-        - No open PR → run `gh pr create --title "<spec_title>" --body "<auto-body>"`.
-     3. Auto-body format:
-        ```
-        ## Summary
-        <spec Summary section verbatim>
+        - Open PR found → run `gh pr edit <number> --body "<pr-body>"`.
+        - No open PR → run `gh pr create --title "<spec_title>" --body "<pr-body>"`.
+     3. **PR body generation** — build `<pr-body>` as follows:
 
-        ## Commits
-        <output of: git log origin/main..<branch> --oneline>
+        **a. Discover PR template.** Search these paths in order and use the first that exists:
+           1. `.github/PULL_REQUEST_TEMPLATE.md`
+           2. `.github/pull_request_template.md`
+           3. `.gitlab/merge_request_templates/Default.md`
+           4. `docs/pull_request_template.md`
+           5. `PULL_REQUEST_TEMPLATE.md` (repo root)
+           6. `pull_request_template.md` (repo root)
 
-        🤖 Generated with [Claude Code](https://claude.com/claude-code)
-        ```
-        If `CLAUDE_ATTRIBUTION` is `false`, omit the `🤖 Generated with [Claude Code](https://claude.com/claude-code)` line.
+        **b. Template found → fill it.**
+           - Parse the template into sections (split on markdown headings `## …` / `### …`). Any content before the first heading is the *preamble*.
+           - Prepare spec data:
+             - `SUMMARY` = spec `## Summary` section body (verbatim).
+             - `COMMITS` = output of `git log origin/main..<branch> --oneline`.
+             - `ATTRIBUTION` = `🤖 Generated with [Claude Code](https://claude.com/claude-code)` (omit entirely when `CLAUDE_ATTRIBUTION` is `false`).
+           - For each template section, decide by reading the section heading and any placeholder/prompt text:
+             - Section asks for a **description, summary, overview, or context** → replace its body with `SUMMARY`.
+             - Section asks for **changes, changelog, or what changed** → replace its body with `COMMITS`.
+             - Section is fillable from other spec content (e.g., "Related Issues" can be filled from `source_ref`) → fill with the appropriate value.
+             - Section cannot be filled (e.g., "Screenshots", "Testing checklist" with no matching data) → remove the section entirely (heading + body).
+           - Append `ATTRIBUTION` (if non-empty) as the last line of the body.
+           - Preserve preamble and any HTML comments (`<!-- … -->`) from the template that precede headings.
+
+        **c. No template found → use default format.**
+           ```
+           ## Summary
+           <spec Summary section verbatim>
+
+           ## Commits
+           <output of: git log origin/main..<branch> --oneline>
+
+           🤖 Generated with [Claude Code](https://claude.com/claude-code)
+           ```
+           If `CLAUDE_ATTRIBUTION` is `false`, omit the `🤖 Generated with [Claude Code](https://claude.com/claude-code)` line.
+
      4. On `gh` success print the PR URL.
      5. On `gh` failure (not installed, not authenticated, etc.): keep the push, print the error verbatim, and print the equivalent manual command the user can run.
 
