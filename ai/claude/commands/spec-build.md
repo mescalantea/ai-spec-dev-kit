@@ -134,17 +134,21 @@ All checked or superseded:
 
         **b. Template found → fill it.**
            - Parse the template into sections (split on markdown headings `## …` / `### …`). Any content before the first heading is the *preamble*.
+           - **Preamble handling**: If the preamble contains explicit removal instructions (e.g., "remove before submitting", ✂ markers, or similar prompts directed at the PR author), strip the entire preamble. Otherwise preserve it, including any HTML comments (`<!-- … -->`).
            - Prepare spec data:
              - `SUMMARY` = spec `## Summary` section body (verbatim).
+             - `IMPLEMENTATION` = spec `## Analysis` section body + the step descriptions from `## Implementation Plan` (without checkboxes/status markup). If `## Analysis` is absent, use only the plan steps.
              - `COMMITS` = output of `git log origin/main..<branch> --oneline`.
              - `ATTRIBUTION` = `🤖 Generated with [Claude Code](https://claude.com/claude-code)` (omit entirely when `CLAUDE_ATTRIBUTION` is `false`).
            - For each template section, decide by reading the section heading and any placeholder/prompt text:
-             - Section asks for a **description, summary, overview, or context** → replace its body with `SUMMARY`.
+             - Section asks for a **description, summary, overview, goal, purpose, or context** → replace its body with `SUMMARY`.
+             - Section asks for **implementation, approach, or how something is done** → replace its body with `IMPLEMENTATION`.
              - Section asks for **changes, changelog, or what changed** → replace its body with `COMMITS`.
-             - Section is fillable from other spec content (e.g., "Related Issues" can be filled from `source_ref`) → fill with the appropriate value.
-             - Section cannot be filled (e.g., "Screenshots", "Testing checklist" with no matching data) → remove the section entirely (heading + body).
+             - Section asks for **references, links, or related issues** → fill sub-items that can be derived from spec data (e.g., `source_ref` → issue link) and remove sub-items that cannot be filled. If no sub-items can be filled, remove the entire section.
+             - Section cannot be filled **but its placeholder text suggests a default value** (e.g., "just write 'Standard deployment'") → keep the section and replace its body with that default.
+             - Section cannot be filled and has no suggested default (e.g., "Screenshots", "Testing checklist") → remove the section entirely (heading + body).
+           - If no template section naturally received `COMMITS`, append a `## Commits` section containing the commit list at the end of the body (before attribution).
            - Append `ATTRIBUTION` (if non-empty) as the last line of the body.
-           - Preserve preamble and any HTML comments (`<!-- … -->`) from the template that precede headings.
 
         **c. No template found → use default format.**
            ```
