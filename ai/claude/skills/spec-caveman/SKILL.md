@@ -9,49 +9,44 @@ description: >
   Two modes: lite (default, all output) and full (drops articles, fragments OK, informative prose only).
 ---
 
-Compress all user-facing prose in SDD commands. Technical substance stays. Fluff dies.
+All SDD prose → compressed. Technical substance stay. Fluff die.
 
 ## Persistence
 
-Active for full command lifecycle. Deactivate only on: "stop caveman", "normal mode", final summary block, or user leaving SDD flow.
+Active full lifecycle. Off only: user leaves SDD flow.
 
-Default: **lite**. Switch: user says `full` or `lite`.
+Default **lite**.
 
-## Modes
+## Lite (default)
 
-### Lite (default)
+All output — spec prose (summaries, analysis, clarifications, plans) included. Stay lite even on "what?" / repeats.
 
-Applied to **all** output — including spec file prose (summaries, analysis, clarifications, plan descriptions). Stays active even when user asks "what?" or repeats.
-
-Drop: filler (just/really/basically/actually/simply), pleasantries (sure/certainly/of course), hedging (I think maybe / perhaps we could / it might be).
-
-Keep: articles, full sentences, subject+verb grammar. Professional, tight.
+Drop: filler (just/really/basically/actually/simply), pleasantries (sure/certainly/of course), hedging (I think maybe / perhaps we could).
+Keep: articles, full sentences, subject+verb. Professional but tight.
 
 Pattern: `[thing] [action] [reason]. [next step].`
 
 - No: "Sure! I'd be happy to help. The issue is likely a stale cache."
-- Yes: "The issue is a stale cache. Clear `.sdd/specs/.cache/<id>.jira.md` and re-run `/spec-plan`."
+- Yes: "Stale cache. Clear `.sdd/specs/.cache/<id>.jira.md`, re-run `/spec-plan`."
 
-Technical terms exact. Code blocks unchanged. Errors quoted verbatim.
+Tech terms exact. Code blocks untouched. Errors verbatim.
 
-### Full
+## Full
 
-Applied to informative non-code prose during the spec lifecycle (explanations, analysis rationale, option descriptions, status summaries). Falls back to **lite** when user asks "what?" or repeats.
+Informative non-code prose only (explanations, rationale, option descriptions, status). Falls back → **lite** on "what?" / repeats.
 
 Drop: articles (a/an/the), filler, pleasantries, hedging. Fragments OK. Short synonyms (big not extensive, fix not "implement a solution for").
-
-Pattern: `[thing] [action] [reason]. [next step].`
 
 - Lite: "The component re-renders because you create a new object reference each render."
 - Full: "New object ref each render → re-render."
 
-Technical terms exact. Code blocks unchanged. Errors quoted verbatim.
+Tech terms exact. Code blocks untouched. Errors verbatim.
 
 ## Never compress
 
-- Security warnings, irreversible action confirmations, multi-step sequences where fragment order risks misread
-- Tool errors (`acli`, `git`, `bash`) — quote exact
-- Interactive prompt strings (`Type "continue"...`), `──────────` border blocks
-- Code, diffs, frontmatter, source code file contents (spec prose is compressible, source files are not)
-- Git commit messages (subject + body + `Co-Authored-By` footer)
+- Security warnings, irreversible confirmations, multi-step sequences where fragment order risks misread
+- Tool errors (`acli`, `git`, `bash`) — exact
+- Interactive prompts (`Type "continue"...`), `──────────` border blocks
+- Code, diffs, frontmatter, source file contents (spec prose compressible, source files not)
+- Git commit messages (subject + body + `Co-Authored-By`)
 - PR titles and bodies
