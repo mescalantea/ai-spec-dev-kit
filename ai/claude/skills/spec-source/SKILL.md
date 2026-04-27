@@ -17,7 +17,8 @@ Returns the external description as a markdown body (no frontmatter).
 
 1. `source == "local"` → return empty template body.
 2. Else → follow pull procedure for `source` in `.sdd/sources.md`.
-3. Auth failure → print:
+3. If the returned body is in a non-markdown format (e.g., Jira wiki markup), convert it to markdown before returning. Follow the reverse of the format conversion rules in `.sdd/sources.md`.
+4. Auth failure → print:
    ```
    <source> authentication failed. Run `<source auth command>`, then type "continue" to retry.
    ```
@@ -45,10 +46,12 @@ Sends local body to the external source and refreshes the cache.
 1. `source == "local"` → no-op.
 2. Call `detect_conflict` first. If conflict and user does not `continue` → stop, do not overwrite.
 3. Strip frontmatter (everything between the first and second `---`, inclusive).
-4. Write stripped body to a temp file.
-5. Follow push procedure for `source` in `.sdd/sources.md` using the temp file.
-6. Auth failure → handle same as `pull`.
-7. Success → overwrite `.sdd/specs/.cache/<ref>.<source>.md` with pushed body. Create `.sdd/specs/.cache/` if missing.
+4. Strip the first `# Spec: …` heading line — external systems already use the ticket title/summary; a duplicate heading in the description is redundant.
+5. Strip HTML comments (`<!-- … -->`).
+6. **Convert to the target format.** Specs are authored in markdown, but not all backends accept markdown natively. Follow the format conversion instructions for `source` in `.sdd/sources.md` (e.g., Jira requires wiki markup). Write the converted body to a temp file.
+7. Follow push procedure for `source` in `.sdd/sources.md` using the temp file.
+8. Auth failure → handle same as `pull`.
+9. Success → overwrite `.sdd/specs/.cache/<ref>.<source>.md` with the **original markdown** body (pre-conversion) so that cache comparisons remain in a single format.
 
 ### `detect_conflict(source, ref) -> (has_conflict, diff)`
 
@@ -71,6 +74,9 @@ Checks for external drift since the last known sync.
 ## Guarantees
 
 - **Frontmatter is local-only.** Never push it. Always strip between first and second `---`.
+- **Title heading is local-only.** Strip the first `# Spec: …` line before pushing — external systems already display the ticket title.
+- **Format conversion is required.** Push the body in the format the target system expects (e.g., Jira wiki markup), not raw markdown. See `.sdd/sources.md` for per-adapter conversion rules.
+- **Cache stores markdown.** Cache files always contain the markdown version (pre-conversion) so comparisons stay consistent.
 - **Cache is authoritative** for last-known remote. Only `pull` and successful `push` may overwrite it.
 - **No silent overwrites.** On drift, user must type `continue` before `push` proceeds.
 - **Auth failures recoverable.** Always offer retry via `continue`.
