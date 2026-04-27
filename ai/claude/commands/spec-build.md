@@ -120,19 +120,48 @@ All checked or superseded:
    - `push + PR`:
      1. Run `git push -u origin <branch>`. On push failure print the error verbatim and proceed to step 3 (do not attempt PR).
      2. Check whether an open PR already tracks this branch: `gh pr list --head <branch> --state open --json number,url`.
-        - Open PR found → run `gh pr edit <number> --body "<auto-body>"`.
-        - No open PR → run `gh pr create --title "<spec_title>" --body "<auto-body>"`.
-     3. Auto-body format:
-        ```
-        ## Summary
-        <spec Summary section verbatim>
+        - Open PR found → run `gh pr edit <number> --body "<pr-body>"`.
+        - No open PR → run `gh pr create --title "<spec_title>" --body "<pr-body>"`.
+     3. **PR body generation** — build `<pr-body>` as follows:
 
-        ## Commits
-        <output of: git log origin/main..<branch> --oneline>
+        **a. Discover PR template.** Search these paths in order and use the first that exists:
+           1. `.github/PULL_REQUEST_TEMPLATE.md`
+           2. `.github/pull_request_template.md`
+           3. `.gitlab/merge_request_templates/Default.md`
+           4. `docs/pull_request_template.md`
+           5. `PULL_REQUEST_TEMPLATE.md` (repo root)
+           6. `pull_request_template.md` (repo root)
 
-        🤖 Generated with [Claude Code](https://claude.com/claude-code)
-        ```
-        If `CLAUDE_ATTRIBUTION` is `false`, omit the `🤖 Generated with [Claude Code](https://claude.com/claude-code)` line.
+        **b. Template found → fill it.**
+           - Parse the template into sections (split on markdown headings `## …` / `### …`). Any content before the first heading is the *preamble*.
+           - **Preamble handling**: If the preamble contains explicit removal instructions (e.g., "remove before submitting", ✂ markers, or similar prompts directed at the PR author), strip the entire preamble. Otherwise preserve it, including any HTML comments (`<!-- … -->`).
+           - Prepare spec data:
+             - `SUMMARY` = spec `## Summary` section body (verbatim).
+             - `IMPLEMENTATION` = spec `## Analysis` section body + the step descriptions from `## Implementation Plan` (without checkboxes/status markup). If `## Analysis` is absent, use only the plan steps.
+             - `COMMITS` = output of `git log origin/main..<branch> --oneline`.
+             - `ATTRIBUTION` = `🤖 Generated with [Claude Code](https://claude.com/claude-code)` (omit entirely when `CLAUDE_ATTRIBUTION` is `false`).
+           - For each template section, decide by reading the section heading and any placeholder/prompt text:
+             - Section asks for a **description, summary, overview, goal, purpose, or context** → replace its body with `SUMMARY`.
+             - Section asks for **implementation, approach, or how something is done** → replace its body with `IMPLEMENTATION`.
+             - Section asks for **changes, changelog, or what changed** → replace its body with `COMMITS`.
+             - Section asks for **references, links, or related issues** → fill sub-items that can be derived from spec data (e.g., `source_ref` → issue link) and remove sub-items that cannot be filled. If no sub-items can be filled, remove the entire section.
+             - Section cannot be filled **but its placeholder text suggests a default value** (e.g., "just write 'Standard deployment'") → keep the section and replace its body with that default.
+             - Section cannot be filled and has no suggested default (e.g., "Screenshots", "Testing checklist") → remove the section entirely (heading + body).
+           - If no template section naturally received `COMMITS`, append a `## Commits` section containing the commit list at the end of the body (before attribution).
+           - Append `ATTRIBUTION` (if non-empty) as the last line of the body.
+
+        **c. No template found → use default format.**
+           ```
+           ## Summary
+           <spec Summary section verbatim>
+
+           ## Commits
+           <output of: git log origin/main..<branch> --oneline>
+
+           🤖 Generated with [Claude Code](https://claude.com/claude-code)
+           ```
+           If `CLAUDE_ATTRIBUTION` is `false`, omit the `🤖 Generated with [Claude Code](https://claude.com/claude-code)` line.
+
      4. On `gh` success print the PR URL.
      5. On `gh` failure (not installed, not authenticated, etc.): keep the push, print the error verbatim, and print the equivalent manual command the user can run.
 
