@@ -187,13 +187,33 @@ fi
 echo
 echo "Source configuration"
 echo "--------------------"
+echo "Choose the spec source for this project:"
+echo "  1) local    — specs live only in .sdd/specs/ (no external sync)"
+echo "  2) jira     — sync specs with Jira issues via acli"
+echo "  3) youtrack — sync specs with YouTrack issues via REST API"
+echo
 
-JIRA_ENABLED=$(prompt_yn "Enable Jira as a spec source?" "n")
+SOURCE_CHOICE=""
+while :; do
+  SOURCE_CHOICE=$(prompt "Enter your choice (1/2/3)" "1")
+  case "$SOURCE_CHOICE" in
+    1) SELECTED_SOURCE="local";    break ;;
+    2) SELECTED_SOURCE="jira";     break ;;
+    3) SELECTED_SOURCE="youtrack"; break ;;
+    *) echo "Invalid choice. Please enter 1, 2, or 3." ;;
+  esac
+done
+
+JIRA_ENABLED=false
 JIRA_PROJECT_KEY=""
 JIRA_WORKSPACE=""
-CLAUDE_ATTRIBUTION=$(prompt_yn "Include Claude as a co-author in commits and PR bodies?" "y")
+YOUTRACK_ENABLED=false
+YOUTRACK_BASE_URL=""
+YOUTRACK_TOKEN_ENV="YOUTRACK_TOKEN"
+YOUTRACK_PROJECT_ID=""
 
-if [ "$JIRA_ENABLED" = "true" ]; then
+if [ "$SELECTED_SOURCE" = "jira" ]; then
+  JIRA_ENABLED=true
   if ! command -v acli >/dev/null 2>&1; then
     echo
     echo "Warning: 'acli' (Atlassian CLI) is not on PATH."
@@ -204,12 +224,8 @@ if [ "$JIRA_ENABLED" = "true" ]; then
   JIRA_WORKSPACE=$(prompt "acli workspace" "")
 fi
 
-YOUTRACK_ENABLED=$(prompt_yn "Enable YouTrack as a spec source?" "n")
-YOUTRACK_BASE_URL=""
-YOUTRACK_TOKEN_ENV="YOUTRACK_TOKEN"
-YOUTRACK_PROJECT_ID=""
-
-if [ "$YOUTRACK_ENABLED" = "true" ]; then
+if [ "$SELECTED_SOURCE" = "youtrack" ]; then
+  YOUTRACK_ENABLED=true
   if ! command -v curl >/dev/null 2>&1; then
     echo
     echo "Warning: 'curl' is not on PATH. The YouTrack adapter requires curl."
@@ -228,6 +244,9 @@ if [ "$YOUTRACK_ENABLED" = "true" ]; then
   fi
   YOUTRACK_PROJECT_ID=$(prompt "YouTrack project ID (optional, for future create-on-push)" "")
 fi
+
+echo
+CLAUDE_ATTRIBUTION=$(prompt_yn "Include Claude as a co-author in commits and PR bodies?" "y")
 
 echo
 echo "Version control"
@@ -274,18 +293,16 @@ cat > "$DST_CONFIG" <<EOF
 {
   "claude_attribution": $CLAUDE_ATTRIBUTION,
   "track_specs": $TRACK_SPECS,
+  "source": "$SELECTED_SOURCE",
   "sources": {
     "local": {
-      "enabled": true,
       "path": ".sdd/specs"
     },
     "jira": {
-      "enabled": $JIRA_ENABLED,
       "project_key": "$JIRA_PROJECT_KEY",
       "workspace": "$JIRA_WORKSPACE"
     },
     "youtrack": {
-      "enabled": $YOUTRACK_ENABLED,
       "base_url": "$YOUTRACK_BASE_URL",
       "token_env": "$YOUTRACK_TOKEN_ENV",
       "project_id": "$YOUTRACK_PROJECT_ID"
@@ -314,13 +331,10 @@ cat <<EOF
 Done.
 
 Claude attribution: $CLAUDE_ATTRIBUTION
-Enabled sources:
-  local:     true
-  jira:      $JIRA_ENABLED
-  youtrack:  $YOUTRACK_ENABLED
+Source: $SELECTED_SOURCE
 EOF
 
-if [ "$JIRA_ENABLED" = "true" ]; then
+if [ "$SELECTED_SOURCE" = "jira" ]; then
   cat <<EOF
     project_key: $JIRA_PROJECT_KEY
     workspace:   $JIRA_WORKSPACE
@@ -329,7 +343,7 @@ if [ "$JIRA_ENABLED" = "true" ]; then
 EOF
 fi
 
-if [ "$YOUTRACK_ENABLED" = "true" ]; then
+if [ "$SELECTED_SOURCE" = "youtrack" ]; then
   cat <<EOF
     base_url:  $YOUTRACK_BASE_URL
     token_env: $YOUTRACK_TOKEN_ENV
