@@ -38,9 +38,9 @@ Run `acli auth login`, then type "continue" to retry.
 ```
 and wait.
 
-- `pull(ref)`: `acli jira workitem view <ref> --json`, extract `description`. Empty → empty template body.
+- `pull(ref)`: `acli jira workitem view --key <ref> --json`, extract `description`. Empty → empty template body.
 - `adapt(body)`: match sections to template headers. If mismatched: map into closest sections, leave unmatched as `...`, append unmapped under `## Original Description`. Show proposal, require `continue` before writing.
-- `push(ref, body)`: strip frontmatter, write to temp file, run `acli jira workitem edit <ref> --description-file=<tmp>`, then overwrite `.sdd/specs/.cache/<ref>.jira.md` with the pushed body.
+- `push(ref, body)`: strip frontmatter, write to temp file, run `acli jira workitem edit --key <ref> --description-file=<tmp>`, then overwrite `.sdd/specs/.cache/<ref>.jira.md` with the pushed body.
 - `detect_conflict(ref, cached_body)`: pull current Jira body, diff against `cached_body`. If different, require `continue` before overwrite.
 
 ### `youtrack`
