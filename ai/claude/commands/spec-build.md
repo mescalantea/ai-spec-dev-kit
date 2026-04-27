@@ -10,7 +10,7 @@ User input: $ARGUMENTS
 
 - Adapter catalog: `.sdd/sources.md`.
 - Source I/O: delegate `push`, `detect_conflict`, and cache management to the `spec-source` skill.
-- Response style: `spec-caveman` skill applies (lite; exceptions for code/commits/prompts).
+- Response style: `spec-caveman` skill applies (mode auto-selected per output type).
 
 ## Workflow
 
@@ -19,6 +19,8 @@ User input: $ARGUMENTS
 Read `.sdd/specs/<spec_id>.md`. Parse frontmatter (`source`, `source_ref`). Body must contain an `## Implementation Plan` section with checkboxes. Missing → tell user to run `/spec-plan <spec_id>` first and stop.
 
 Read `.sdd/config.json`. Extract `claude_attribution` (top-level boolean field). If the field is absent, non-boolean, or `config.json` is missing, default to `true`. Store as `CLAUDE_ATTRIBUTION` for use in §6 and §8.
+
+Extract `track_specs` (top-level boolean field). If absent, non-boolean, or `config.json` is missing, default to `true`. Store as `TRACK_SPECS` for use in §6.
 
 ### 2. Find next step
 
@@ -70,7 +72,8 @@ Type any feedback to request changes before committing.
    - If `CLAUDE_ATTRIBUTION` is `true`: include a `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` trailer in the commit message body.
    - If `CLAUDE_ATTRIBUTION` is `false`: do **not** append any `Co-Authored-By` trailer. Pass the full commit message explicitly and do not add attribution.
 3. Update spec: change `- [ ] Step N:` to `- [x] Step N:` for the completed step.
-4. `git add .sdd/specs/<spec_id>.md && git commit --amend --no-edit`
+4. If `TRACK_SPECS` is `true`: `git add .sdd/specs/<spec_id>.md && git commit --amend --no-edit`
+   If `TRACK_SPECS` is `false`: skip — the checkbox update lives on disk only.
 5. Print: `✓ Step N committed. Moving to next step...`
 
 ### 7. Loop

@@ -235,6 +235,13 @@ echo "---------------"
 echo "The toolkit directories can be kept local-only (gitignored) or committed."
 GITIGNORE_TOOLKIT=$(prompt_yn "Exclude toolkit from version control (.sdd/, .claude/commands/, .claude/skills/)?" "n")
 
+# Derive track_specs (inverse of GITIGNORE_TOOLKIT) for config.json.
+if [ "$GITIGNORE_TOOLKIT" = "true" ]; then
+  TRACK_SPECS=false
+else
+  TRACK_SPECS=true
+fi
+
 # ---------------------------------------------------------------------------
 # Apply.
 # ---------------------------------------------------------------------------
@@ -266,6 +273,7 @@ echo "  wrote $DST_TEMPLATE_DIR/spec.md"
 cat > "$DST_CONFIG" <<EOF
 {
   "claude_attribution": $CLAUDE_ATTRIBUTION,
+  "track_specs": $TRACK_SPECS,
   "sources": {
     "local": {
       "enabled": true,

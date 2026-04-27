@@ -11,7 +11,7 @@ User input: $ARGUMENTS
 - Enabled sources: `.sdd/config.json`.
 - Adapter catalog: `.sdd/sources.md`.
 - Source I/O: delegate `pull`, `adapt`, and cache management to the `spec-source` skill.
-- Response style: `spec-caveman` skill applies (lite; exceptions for code/commits/prompts).
+- Response style: `spec-caveman` skill applies (mode auto-selected per output type).
 
 ## Workflow
 
@@ -36,12 +36,15 @@ Check whether `.sdd/specs/<spec_id>.md` exists.
 - **Exists** → refresh mode. Skip branch creation. Refresh body and commit as a standalone commit.
 - **Missing** → new draft mode. Do dirty tree check and create branch.
 
+Read `.sdd/config.json`. Extract `track_specs` (top-level boolean field). If absent, non-boolean, or `config.json` is missing, default to `true`. Store as `TRACK_SPECS`.
+
 ### 3. Dirty tree check
 
 Run `git status --porcelain`.
 
 - New draft: non-empty → abort, ask user to commit or stash.
 - Refresh: anything other than `.sdd/specs/<spec_id>.md` → abort.
+- When `TRACK_SPECS` is `false`: `.sdd/` files are gitignored and will not appear in `git status` output. Only non-ignored dirty files matter for the check.
 
 ### 4. Choose source
 
@@ -90,10 +93,13 @@ No implementation details, code examples, or file paths — product-level docume
 
 Refresh mode, after writing:
 
+If `TRACK_SPECS` is `true`:
 ```
 git add .sdd/specs/<spec_id>.md .sdd/specs/.cache/<spec_id>.<source>.md 2>/dev/null
 git commit -m "<spec_id>: refresh spec from <source>"
 ```
+
+If `TRACK_SPECS` is `false`: skip — the spec update lives on disk only.
 
 New draft: leave uncommitted — user commits after review.
 
