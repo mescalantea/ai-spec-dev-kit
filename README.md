@@ -1,4 +1,4 @@
-# Spec-Driven Toolkit
+# Spec-Driven Development Toolkit
 
 A practical toolkit to adopt **Spec-Driven Development (SDD)** in modern software projects using AI-assisted workflows.
 
