@@ -162,6 +162,7 @@ Commands:
   sdd init       Set up the toolkit in a project
   sdd upgrade    Update to the latest version
   sdd version    Show version info
+  sdd uninstall  Remove sdd CLI and shell hook
   sdd help       Show available commands
 
 Get started:

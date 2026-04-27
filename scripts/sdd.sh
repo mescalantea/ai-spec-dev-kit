@@ -8,6 +8,7 @@
 #   init      Initialize or re-initialize the SDD toolkit in the current project
 #   upgrade   Update the toolkit to the latest version
 #   version   Show installed and latest available versions
+#   uninstall Remove the sdd CLI and shell hook
 #   help      Show this help message
 #
 # Compatible with macOS default bash (3.2) and Linux.
@@ -97,6 +98,7 @@ Commands:
   init        Initialize or re-initialize the SDD toolkit in the current project
   upgrade     Update the toolkit to the latest version
   version     Show installed and latest available versions
+  uninstall   Remove the sdd CLI and shell hook
   help        Show this help message
 
 Run 'sdd init' from your project root to set up the spec commands and configuration.
@@ -158,6 +160,10 @@ cmd_init() {
   exec "$SCRIPT_DIR/setup.sh" "$@"
 }
 
+cmd_uninstall() {
+  exec "$SCRIPT_DIR/uninstall.sh"
+}
+
 # ---------------------------------------------------------------------------
 # Dispatch.
 # ---------------------------------------------------------------------------
@@ -174,6 +180,9 @@ case "$COMMAND" in
     ;;
   version)
     cmd_version
+    ;;
+  uninstall)
+    cmd_uninstall
     ;;
   help|--help|-h)
     cmd_help

@@ -96,6 +96,7 @@ Re-run `sdd init` any time to reinitialize — existing files are overwritten. `
 | `sdd init` | Initialize or re-initialize the SDD toolkit in the current project |
 | `sdd upgrade` | Pull the latest toolkit changes from the remote repository |
 | `sdd version` | Show installed version (commit hash) and latest available |
+| `sdd uninstall` | Remove the `sdd` CLI symlink and shell hook |
 | `sdd help` | Show available commands |
 
 ### Auto-update check
@@ -196,6 +197,7 @@ No command or skill changes needed — the skill reads the catalog at runtime.
 │   ├── sdd.sh                  # CLI facade (symlinked as `sdd`)
 │   ├── setup.sh                # Wizard invoked by `sdd init`
 │   ├── install.sh              # Installs `sdd` on PATH + shell hook
+│   ├── uninstall.sh            # Removes `sdd` from PATH + shell hook
 │   └── check-update.sh         # Auto-update check run by the shell hook
 ├── CLAUDE.md
 ├── LICENSE
