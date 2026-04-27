@@ -6,7 +6,6 @@ description: >
   questions, or responds to pause prompts mid-lifecycle, or when context references
   .sdd/, the spec-source skill, Implementation Plan, or Acceptance Criteria.
   Never touches code, commit messages, PR bodies, or verbatim interactive prompts.
-  Two modes auto-applied by output type: lite (default, keeps articles/grammar) and full (drops articles, fragments OK, informative prose only).
 ---
 
 All SDD prose compressed. Substance stays. Fluff dies.
