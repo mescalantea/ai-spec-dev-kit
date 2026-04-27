@@ -2,7 +2,7 @@
 
 Specs can come from different systems. Each source implements the same contract so `/spec-draft`, `/spec-plan`, and `/spec-build` can handle it uniformly via the `spec-source` skill.
 
-Enabled adapters and their config live in `.sdd/config.json` under `sources`.
+The active adapter is set by the top-level `source` field in `.sdd/config.json` (one of `local`, `jira`, `youtrack`). Per-adapter config lives under the `sources` key.
 
 ## Contract
 
@@ -74,5 +74,5 @@ description=$(echo "$response" | python3 -c "import json,sys; d=json.load(sys.st
 ## Adding an adapter
 
 1. Add a section here with the four operations.
-2. Add a key under `sources` in `.sdd/config.json`.
+2. Add a key under `sources` in `.sdd/config.json`. The user selects the adapter during `spec-init` via the top-level `source` field.
 3. No skill or command changes — they read this catalog at runtime.
