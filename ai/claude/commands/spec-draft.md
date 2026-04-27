@@ -48,12 +48,10 @@ Run `git status --porcelain`.
 
 ### 4. Choose source
 
-Read `.sdd/config.json`, list sources with `enabled: true`.
+Read `.sdd/config.json`, extract the top-level `source` field (one of `local`, `jira`, `youtrack`). If absent or not a recognised value, default to `local`.
 
-- Only `local` enabled → `source = local`, skip to step 6.
-- Otherwise → ask user to pick.
-
-Non-local source → ask for `source_ref` if different from `spec_id`. Default: `source_ref = spec_id`.
+- `source == "local"` → skip to step 6.
+- Otherwise → use the selected source. Ask for `source_ref` if different from `spec_id`. Default: `source_ref = spec_id`.
 
 ### 5. Pull and adapt (skill)
 

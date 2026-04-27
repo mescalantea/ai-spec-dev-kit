@@ -7,7 +7,7 @@ description: Pull, adapt, push, and detect drift for specs stored in external sy
 
 Unified adapter for reading and writing specs across multiple backends. Used by `/spec-draft`, `/spec-plan`, `/spec-build`.
 
-Adapter catalog: `.sdd/sources.md`. Config: `.sdd/config.json`.
+Adapter catalog: `.sdd/sources.md`. Config: `.sdd/config.json` (top-level `source` field selects the active adapter; per-adapter settings under `sources`).
 
 ## Operations
 
@@ -78,5 +78,5 @@ Checks for external drift since the last known sync.
 ## Adding an adapter
 
 1. Add a section in `.sdd/sources.md` with wire calls for `pull` and `push`.
-2. Add a key under `sources` in `.sdd/config.json` with its config (project key, workspace, token env, etc.).
+2. Add a key under `sources` in `.sdd/config.json` with its config (project key, workspace, token env, etc.). The user selects the adapter during `spec-init` via the top-level `source` field.
 3. No skill or command changes needed — this skill reads the catalog at runtime.
