@@ -21,8 +21,9 @@ The toolkit enforces the split by shipping four distinct slash commands, one per
 - **`spec-source` skill** — reusable pull / adapt / push / conflict-detection across spec backends (`local`, `jira`, `youtrack`, extensible to Linear / GitHub Issues).
 - **`spec-caveman` skill** — terse-response style that auto-activates inside SDD commands to cut token usage without losing technical substance. Commits and PRs are never compressed.
 - **Adapter catalog** (`.sdd/sources.md`) — agent-neutral description of each source's wire calls.
-- **Setup wizard** (`scripts/setup.sh`) — POSIX bash, macOS + Linux. Copies commands, skills, template, and generates `.sdd/config.json` from your answers.
-- **Global installer** (`scripts/install-global.sh`) — exposes the wizard as `spec-init` on your PATH.
+- **`sdd` CLI** (`scripts/sdd.sh`) — global facade with subcommands: `init`, `upgrade`, `version`, `help`.
+- **Setup wizard** (`scripts/setup.sh`) — POSIX bash, macOS + Linux. Copies commands, skills, template, and generates `.sdd/config.json` from your answers. Invoked via `sdd init`.
+- **Installer** (`scripts/install.sh`) — symlinks `sdd` onto PATH and installs the auto-update shell hook.
 
 ---
 
@@ -55,29 +56,22 @@ git clone https://github.com/mescalantea/ai-spec-dev-kit.git
 cd ai-spec-dev-kit
 ```
 
-### 2. (Optional) Expose `spec-init` globally
+### 2. Install the `sdd` CLI
 
 ```bash
-./scripts/install-global.sh
+./scripts/install.sh
 ```
 
-The script symlinks `scripts/setup.sh` into the first writable directory it finds on your PATH (`$HOME/.local/bin`, `/usr/local/bin`, or `/opt/homebrew/bin`). After this you can run `spec-init` from any project root.
+This does two things:
 
-### 3. (Optional) Enable auto-update checks on terminal open
+1. **Symlinks `sdd`** into the first writable directory on your PATH (`$HOME/.local/bin`, `/usr/local/bin`, or `/opt/homebrew/bin`).
+2. **Installs a shell hook** that checks for updates every time you open a new terminal session. The hook detects your shell (`$SHELL`), resolves the right profile (`~/.zshrc` for zsh, `~/.bash_profile` for bash), and appends a one-line hook. Safe to re-run.
 
-```bash
-./scripts/install-hook.sh
-```
-
-The script detects your shell (`$SHELL`), resolves the right profile (`~/.zshrc` for zsh, `~/.bash_profile` for bash), and appends a one-line hook. Safe to re-run — the line is injected only once. See [Auto-Update Check](#-auto-update-check) for details.
-
-### 4. Initialize the toolkit in your target project
+### 3. Initialize the toolkit in your target project
 
 ```bash
 cd /path/to/your/project
-spec-init                                  # if step 2 was done
-# or, without the global install:
-/path/to/ai-spec-dev-kit/scripts/setup.sh
+sdd init
 ```
 
 The wizard:
@@ -91,7 +85,35 @@ The wizard:
 - asks whether to enable YouTrack; if yes, collects the base URL, project key, and token env var name
 - asks whether to gitignore the toolkit directories (`.sdd/`, `.claude/commands/`, `.claude/skills/`) — default no (commit by default)
 
-Re-run any time to reinitialize — existing files are overwritten. `.sdd/specs/<id>.md` files and `.sdd/specs/.cache/` contents are left untouched.
+Re-run `sdd init` any time to reinitialize — existing files are overwritten. `.sdd/specs/<id>.md` files and `.sdd/specs/.cache/` contents are left untouched.
+
+---
+
+## 🔄 CLI Commands
+
+| Command | Description |
+|---|---|
+| `sdd init` | Initialize or re-initialize the SDD toolkit in the current project |
+| `sdd upgrade` | Pull the latest toolkit changes from the remote repository |
+| `sdd version` | Show installed version (commit hash) and latest available |
+| `sdd help` | Show available commands |
+
+### Auto-update check
+
+Every time you open a new terminal, the shell hook compares the local commit hash against the remote. If an update is available, you’re prompted:
+
+```
+SDD toolkit update available: abc1234 -> def5678
+Install now? [Y/n]:
+```
+
+Press Enter or `Y` to update (runs `git pull`). Press `N` to skip. The check runs at most once every 24 hours.
+
+If you’re in a directory with `.sdd/` (an SDD-enabled project), the hook also reminds you:
+
+```
+  Tip: Run "sdd init" to apply toolkit updates to this project.
+```
 
 ---
 
@@ -171,9 +193,9 @@ No command or skill changes needed — the skill reads the catalog at runtime.
 ├── templates/
 │   └── spec.md                 # Spec template with YAML frontmatter
 ├── scripts/
-│   ├── setup.sh                # Wizard invoked by `spec-init`
-│   ├── install-global.sh       # Symlinks setup.sh as `spec-init`
-│   ├── install-hook.sh         # Injects auto-update hook into shell profile
+│   ├── sdd.sh                  # CLI facade (symlinked as `sdd`)
+│   ├── setup.sh                # Wizard invoked by `sdd init`
+│   ├── install.sh              # Installs `sdd` on PATH + shell hook
 │   └── check-update.sh         # Auto-update check run by the shell hook
 ├── CLAUDE.md
 ├── LICENSE
@@ -202,8 +224,8 @@ your-project/
 
 ## 🔄 Updating / reinitializing
 
-- **Toolkit update** — `git pull` in your clone of this repo, then re-run `spec-init` in each target project. Existing commands, skills, template, and `sources.md` are overwritten; your specs and config are not.
-- **Reset a single project** — delete `.claude/commands/spec-*.md`, `.claude/skills/spec-*/`, `.sdd/`, then re-run `spec-init`.
+- **Toolkit update** — run `sdd upgrade`, then `sdd init` in each target project. Existing commands, skills, template, and `sources.md` are overwritten; your specs and config are not.
+- **Reset a single project** — delete `.claude/commands/spec-*.md`, `.claude/skills/spec-*/`, `.sdd/`, then re-run `sdd init`.
 - **Move off the toolkit** — `.sdd/specs/` is just Markdown; it keeps working without the commands.
 - **Legacy `.specs/` directory** — if you have spec files from an older install under `.specs/`, the wizard leaves them untouched. Move them to `.sdd/specs/` manually after reinitializing.
 
@@ -211,17 +233,18 @@ your-project/
 
 ## 🔔 Auto-Update Check
 
-Run `scripts/install-hook.sh` once after cloning (see [Install step 3](#3-optional-enable-auto-update-checks-on-terminal-open)). When a new terminal session opens, the hook silently checks whether the upstream repository has a newer commit. If one is found, it prints a one-line notification and asks for confirmation before applying anything.
+The shell hook is installed automatically by `scripts/install.sh` (see [Install step 2](#2-install-the-sdd-cli)). When a new terminal session opens, the hook silently checks whether the upstream repository has a newer commit. If one is found, it prompts for confirmation (`Y/n`) before applying anything.
 
 The check:
 - runs at most once per 24 hours (cooldown stored in `~/.sdd/.last_update_check`)
 - times out after 5 seconds if the network is unavailable, and fails silently
 - only prompts when your local commit differs from the remote HEAD
 - applies the update with `git pull` in your toolkit clone — target projects are not touched
+- advises you to run `sdd init` if the current directory is an SDD-enabled project
 
 ### Manual installation
 
-If you prefer to add the hook line yourself rather than running `install-hook.sh`:
+If you prefer to add the hook line yourself rather than running `scripts/install.sh`:
 
 **zsh** — add to `~/.zshrc`:
 
