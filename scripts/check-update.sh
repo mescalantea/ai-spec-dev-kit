@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# check-update.sh — checks for ai-spec-dev-kit updates on terminal open.
+# check-update.sh — checks for SDD toolkit updates on terminal open.
 # Silent on all failures; must not block shell startup.
+# Compatible with macOS default bash (3.2) and Linux.
 
 SCRIPT_PATH="$0"
 while [ -L "$SCRIPT_PATH" ]; do
@@ -16,27 +17,29 @@ COOLDOWN_FILE="$HOME/.sdd/.last_update_check"
 COOLDOWN_SECONDS=86400
 
 _check_update() {
-  # Cooldown: skip if checked within 24 hours
+  # Cooldown: skip if checked within 24 hours.
   if [ -f "$COOLDOWN_FILE" ]; then
     last=$(cat "$COOLDOWN_FILE" 2>/dev/null) || return 0
     now=$(date +%s 2>/dev/null) || return 0
     elapsed=$((now - last))
     if [ "$elapsed" -lt "$COOLDOWN_SECONDS" ]; then
+      # Even if we skip the remote check, still advise sdd init.
+      _advise_reinit
       return 0
     fi
   fi
 
-  # Must be a git repo with a valid HEAD
+  # Must be a git repo with a valid HEAD.
   git -C "$REPO_ROOT" rev-parse HEAD >/dev/null 2>&1 || return 0
 
-  # Only run for GitHub remotes (HTTPS or SSH)
+  # Only run for GitHub remotes (HTTPS or SSH).
   remote_url=$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null) || return 0
   case "$remote_url" in
     https://github.com/*|git@github.com:*) ;;
     *) return 0 ;;
   esac
 
-  # Fetch remote HEAD SHA in background with a 5-second timeout
+  # Fetch remote HEAD SHA in background with a 5-second timeout.
   tmp_sha=$(mktemp 2>/dev/null) || return 0
   (git -C "$REPO_ROOT" ls-remote origin HEAD 2>/dev/null | awk '{print $1}' > "$tmp_sha") &
   fetch_pid=$!
@@ -62,27 +65,40 @@ _check_update() {
   local_sha=$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null) || return 0
   [ -n "$local_sha" ] || return 0
 
-  # Record the check time regardless of update availability
+  # Record the check time regardless of update availability.
   mkdir -p "$HOME/.sdd" 2>/dev/null || true
   date +%s > "$COOLDOWN_FILE" 2>/dev/null || true
 
-  # No update available
-  [ "$local_sha" != "$remote_sha" ] || return 0
+  # No update available — still advise reinit if in an SDD project.
+  if [ "$local_sha" = "$remote_sha" ]; then
+    _advise_reinit
+    return 0
+  fi
 
   local_short="${local_sha:0:7}"
   remote_short="${remote_sha:0:7}"
 
-  printf '\nai-spec-dev-kit update available: %s -> %s\n' "$local_short" "$remote_short"
-  printf 'Type "update" to apply, or press Enter to skip: '
+  printf '\nSDD toolkit update available: %s -> %s\n' "$local_short" "$remote_short"
+  printf 'Install now? [Y/n]: '
   read -r answer < /dev/tty || return 0
 
-  [ "$answer" = "update" ] || return 0
+  case "$answer" in
+    n|N|no|NO) return 0 ;;
+  esac
 
   if git -C "$REPO_ROOT" pull 2>&1; then
     new_sha=$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null) || true
     printf 'Updated to %s.\n' "${new_sha:0:7}"
+    _advise_reinit
   else
-    printf 'Update failed. Try: git -C "%s" pull\n' "$REPO_ROOT"
+    printf 'Update failed. Try: sdd upgrade\n'
+  fi
+}
+
+# If the current directory contains .sdd/, advise the user to re-run sdd init.
+_advise_reinit() {
+  if [ -d "$PWD/.sdd" ]; then
+    printf '\n  Tip: Run "sdd init" to apply toolkit updates to this project.\n'
   fi
 }
 

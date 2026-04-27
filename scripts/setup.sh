@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-# spec-init — wizard that copies the SDD toolkit into the current project.
+# setup.sh — wizard that copies the SDD toolkit into the current project.
 #
 # Usage:
 #   cd /path/to/target/project
-#   /path/to/ai-spec-dev-kit/scripts/setup.sh
+#   sdd init
 #
-# Or after running scripts/install-global.sh:
-#   cd /path/to/target/project
-#   spec-init
+# Or directly:
+#   /path/to/ai-spec-dev-kit/scripts/setup.sh
 #
 # Compatible with macOS default bash (3.2) and Linux.
 
@@ -362,5 +361,7 @@ Commands available in Claude Code:
 
 Next: open this project in Claude Code and run
       /spec-draft <SPEC-ID> <type> <short title>
+
+Re-run 'sdd init' any time after 'sdd upgrade' to pick up changes.
 ────────────────────────────────────────────────────
 EOF
