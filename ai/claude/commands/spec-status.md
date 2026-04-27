@@ -6,7 +6,7 @@ allowed-tools: Read, Glob, Bash(git branch:*), Bash(git rev-parse:*), Bash(ls:*)
 
 Report the state of one or more specs. **Read-only**: do not modify files, do not call external services (no `acli`, no network).
 
-Response style: `spec-caveman` skill applies (lite; exceptions for code/commits/prompts).
+Response style: `spec-caveman` skill applies (mode auto-selected per output type).
 
 User input: $ARGUMENTS
 

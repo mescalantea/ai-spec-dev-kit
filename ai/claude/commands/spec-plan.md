@@ -10,7 +10,7 @@ User input: $ARGUMENTS
 
 - Adapter catalog: `.sdd/sources.md`.
 - Source I/O: delegate `push`, `detect_conflict`, and cache management to the `spec-source` skill.
-- Response style: `spec-caveman` skill applies (lite; exceptions for code/commits/prompts).
+- Response style: `spec-caveman` skill applies (mode auto-selected per output type).
 
 ## Workflow
 

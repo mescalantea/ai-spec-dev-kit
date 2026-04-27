@@ -11,7 +11,7 @@ User input: $ARGUMENTS
 - Enabled sources: `.sdd/config.json`.
 - Adapter catalog: `.sdd/sources.md`.
 - Source I/O: delegate `pull`, `adapt`, and cache management to the `spec-source` skill.
-- Response style: `spec-caveman` skill applies (lite; exceptions for code/commits/prompts).
+- Response style: `spec-caveman` skill applies (mode auto-selected per output type).
 
 ## Workflow
 
