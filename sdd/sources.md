@@ -66,9 +66,11 @@ description=$(echo "$response" | jq -r '.description // ""')
 description=$(echo "$response" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('description') or '')")
 ```
 
+**`$type` field:** YouTrack responses include a `$type` key. In jq, `.$type` is a syntax error (`$` starts a variable binding). Always use bracket notation: `.["$type"]`.
+
 - `pull(ref)`: `curl -sS -H "Authorization: Bearer $TOKEN" "$base_url/api/issues/$ref?fields=description"`, extract `description` field. Empty or null → empty template body.
 - `adapt(body)`: same as Jira — match content against template headers; unmapped content → append under `## Original Description`; show proposal; require `continue` before writing.
-- `push(ref, body)`: if `ref` is null/empty, print `YouTrack push skipped: no source_ref set. Create the issue in YouTrack and set source_ref in frontmatter.` and stop. Otherwise: strip frontmatter, write to temp file, run `curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" "$base_url/api/issues/$ref" -d "{\"description\": $(jq -Rs . < "$tmpfile")}"`, then overwrite `.sdd/specs/.cache/<ref>.youtrack.md` with the pushed body.
+- `push(ref, body)`: if `ref` is null/empty, print `YouTrack push skipped: no source_ref set. Create the issue in YouTrack and set source_ref in frontmatter.` and stop. Otherwise: strip frontmatter, write to temp file, run `curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" "$base_url/api/issues/$ref" -d "{\"description\": $(jq -Rs . < "$tmpfile")}"`. Verify success: `echo "$response" | jq -e '.["$type"] == "Issue"'` (or python3 equivalent). On success, overwrite `.sdd/specs/.cache/<ref>.youtrack.md` with the pushed body. On failure, print the response body and stop.
 - `detect_conflict(ref, cached_body)`: pull current remote body, diff against `cached_body`. If different, require `continue` before overwrite (same logic as Jira).
 
 ## Adding an adapter
