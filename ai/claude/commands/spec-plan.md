@@ -8,9 +8,7 @@ Senior software analyst. Understand the spec, explore the codebase, surface risk
 
 User input: $ARGUMENTS
 
-- Adapter catalog: `.sdd/sources.md`.
-- Source I/O: delegate `push`, `detect_conflict`, and cache management to the `spec-source` skill.
-- Response style: `spec-caveman` skill applies (mode auto-selected per output type).
+Output style: terse. No filler, no narration. Code, git commit messages, PR bodies, and verbatim interactive prompts pass through unchanged.
 
 ## Workflow
 
@@ -22,8 +20,6 @@ User input: $ARGUMENTS
 ### 2. Load spec
 
 Read `.sdd/specs/<spec_id>.md`. Missing → tell user to run `/spec-draft <spec_id> ...` and stop.
-
-Parse YAML frontmatter. Remember `source`, `source_ref`.
 
 ### 3. First run vs re-run
 
@@ -110,11 +106,11 @@ Append to spec body (preserve all existing content above):
 
 #### 7b. Re-run
 
-1. Prepend a new entry to `## Clarifications` with the `changes` input and the user's answers from step 6.
+1. Prepend a new entry to `## Clarifications` with the `changes` input and the user's answers from step 6. **Cap each re-run's append at ≤3 bullets** summarising what changed and why — do not enumerate every prior question.
 2. Update `## Analysis` subsections with new/changed Affected Files, Risks, Decisions. Do NOT delete prior entries — append or amend with dated notes (current date).
 3. Refresh `## Implementation Plan`:
    - Checked step still valid (`- [x] Step N: ...`) → keep.
-   - Checked step invalidated → rewrite as `- [x] ~~Step N: <original text>~~ _(superseded: <one-line reason>)_`.
+   - Checked step invalidated → **delete the line outright.** Subsequent step numbers do not renumber — gaps are intentional and indicate where superseded work used to live. Record the *reason* the step was dropped as one of the ≤3 Clarifications bullets.
    - Unchecked step still valid → keep.
    - Unchecked step no longer relevant → remove.
    - New work → append with numbering continuing the sequence (do not renumber existing steps).
@@ -127,25 +123,14 @@ Plan rules (both modes):
 - Final step = run the QA pipeline defined in CLAUDE.md.
 - 3–15 steps total depending on complexity.
 
-### 8. Sync to source
-
-`source == "local"` → skip.
-
-Otherwise, invoke `spec-source`:
-
-1. `push(source, source_ref, body_of(.sdd/specs/<spec_id>.md))`.
-2. Skill handles drift detection, user confirmation, frontmatter stripping, and cache update.
-3. Capture result: `pushed | aborted by user | skipped (conflict unresolved)`.
-
-### 9. Output
+### 8. Output
 
 Print exactly:
 
 ```
 Plan complete for <spec_id>: <spec_title>
 Mode:   <first-run|re-run>
-Steps:  <N> total (<K> carried over, <S> superseded, <M> new)
-Source: <skipped|pushed to <source>:<source_ref>|aborted by user>
+Steps:  <N> total (<K> carried over, <D> deleted, <M> new)
 
 Next: /spec-build <spec_id>
 ```
