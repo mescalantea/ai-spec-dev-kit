@@ -18,7 +18,7 @@ The toolkit enforces the split by shipping four distinct slash commands, one per
 
 - **Spec template** — Markdown template with YAML frontmatter (`.sdd/specs/template/spec.md`). Covers Context, Summary, Functional Requirements, Non-Goals, Edge Cases, Acceptance Criteria, Open Questions, Dependencies, Success Metrics, Testing Guidelines.
 - **Four slash commands** for Claude Code — `/spec-draft`, `/spec-plan`, `/spec-build`, `/spec-status`.
-- **`sdd publish`** — pure-bash command that pushes a local spec to its configured external source (Jira today; YouTrack stub). Lives outside Claude's context — zero tokens on the happy path.
+- **`sdd publish`** — pure-bash command that pushes a local spec to its configured external source (Jira via `acli` + ADF; YouTrack via REST API + markdown). Lives outside Claude's context — zero tokens on the happy path.
 - **`sdd` CLI** (`scripts/sdd.sh`) — global facade with subcommands: `init`, `upgrade`, `version`, `publish`, `uninstall`, `help`.
 - **Setup wizard** (`scripts/setup.sh`) — POSIX bash, macOS + Linux. Copies commands, template, and generates `.sdd/config.json` (records the toolkit version). Invoked via `sdd init`.
 - **Installer** (`scripts/install.sh`) — symlinks `sdd` onto PATH and installs the auto-update shell hook.
@@ -40,10 +40,10 @@ The toolkit enforces the split by shipping four distinct slash commands, one per
 - **Bash** 3.2+ (macOS default) or any modern bash on Linux. The scripts declare `#!/usr/bin/env bash`, so they run under bash regardless of your login shell (zsh, bash, fish — all fine).
 - **Git** — the toolkit manages branches per spec.
 - **Claude Code** CLI.
-- **`python3`** — required by `sdd publish` (config parsing + markdown → ADF conversion). Already present on macOS and most Linux distros.
+- **`python3`** — required by `sdd publish` (config parsing, markdown → ADF conversion, JSON body construction). Already present on macOS and most Linux distros.
 - **`markdown-it-py`** — only if you publish to Jira. Install with `pip3 install --user markdown-it-py` (or in a venv if your Python is externally managed). The publish script prints the install hint when the module is missing.
 - **Atlassian CLI (`acli`)** — only if you publish to Jira (`sdd publish <SPEC-ID>` with `"source": "jira"`). Run `acli auth login` once before publishing. The script targets `--key <REF>` form per `acli jira workitem edit --help`.
-- **`curl`** — only if you publish to YouTrack (currently a stub — implement when needed).
+- **`curl`** — only if you publish to YouTrack. Set the `YOUTRACK_TOKEN` env var (or whatever `sources.youtrack.token_env` is configured to) to a permanent YouTrack token before running `sdd publish`.
 
 ---
 
@@ -193,7 +193,7 @@ Then run `acli auth login` (Jira) and you're ready.
 |---|---|---|
 | `local` | Default | nothing — `sdd publish` is a no-op |
 | `jira` | Working | `acli` (with `acli auth login` done once) + `markdown-it-py`. Converts the spec body to ADF JSON and pushes via `acli jira workitem edit --key <ref> --description-file=…`. |
-| `youtrack` | Stub | not implemented yet |
+| `youtrack` | Working | `curl` + `YOUTRACK_TOKEN` env var. Sends the spec body as markdown verbatim to `POST $base_url/api/issues/<ref>` (YouTrack renders markdown natively). Configure `sources.youtrack.base_url` (instance root, no `/api`, no trailing slash) and `sources.youtrack.token_env` (defaults to `YOUTRACK_TOKEN`) in `.sdd/config.json`. |
 
 ### Why ADF (and not markdown or wiki markup)?
 
@@ -203,7 +203,9 @@ Jira Cloud's description field is **ADF-only** (Atlassian Document Format — st
 
 ### Drift detection
 
-`sdd publish` writes a cache at `.sdd/specs/.cache/<spec_id>.jira.json` (gitignored) holding the ADF document we last pushed. On the next push the script pulls the remote ADF, canonicalizes both sides, and gates on equality. If the remote has changed you're warned and asked to type `continue` before overwrite. ADF JSON diffs aren't human-readable, so the script doesn't show one — inspect the issue in Jira directly to see what changed.
+`sdd publish` writes a cache file (gitignored) for each spec on every successful push:
+- Jira: `.sdd/specs/.cache/<spec_id>.jira.json` — the ADF document we last pushed. The next push pulls the remote ADF, canonicalizes both sides, and gates on equality. ADF JSON diffs aren't human-readable, so the prompt doesn't show one — inspect the issue in Jira directly.
+- YouTrack: `.sdd/specs/.cache/<spec_id>.youtrack.md` — the markdown we last pushed. The next push pulls `description` from the remote and shows a unified diff against the cache; on drift you're asked to type `continue` before overwrite.
 
 ---
 

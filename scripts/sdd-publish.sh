@@ -7,11 +7,11 @@
 # Reads .sdd/config.json's `source` field and dispatches:
 #   local    -> no-op (prints hint, exits 0)
 #   jira     -> markdown -> ADF JSON + acli push (--key form, per acli help)
-#   youtrack -> stub (not implemented)
+#   youtrack -> markdown verbatim + curl POST to /api/issues/<id> (REST API)
 #
 # Errors print verbatim. AI is only invoked if the user asks it to interpret a failure.
 # Compatible with macOS default bash (3.2) and Linux.
-# Requires python3 + markdown-it-py (pip3 install --user markdown-it-py).
+# Requires python3 + (jira: markdown-it-py + acli) + (youtrack: curl).
 
 set -eu
 
@@ -43,22 +43,38 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 # ---------------------------------------------------------------------------
-# Read source from config.
+# Config readers (python3, dotted path).
 # ---------------------------------------------------------------------------
 
-SOURCE="$(python3 -c "
+cfg_get() {
+  python3 - "$CONFIG_FILE" "$1" <<'PY'
 import json, sys
+path, key = sys.argv[1], sys.argv[2]
 try:
-    with open('$CONFIG_FILE') as f:
+    with open(path) as f:
         cfg = json.load(f)
-    print(cfg.get('source') or 'local')
 except Exception:
-    print('local')
-")"
+    sys.exit(0)
+val = cfg
+for k in key.split('.'):
+    if not isinstance(val, dict) or k not in val:
+        sys.exit(0)
+    val = val[k]
+if val is None:
+    sys.exit(0)
+print(val)
+PY
+}
+
+SOURCE="$(cfg_get source)"
+[ -z "$SOURCE" ] && SOURCE="local"
 
 # ---------------------------------------------------------------------------
-# Extract spec body: strip YAML frontmatter and the first '# Spec: …' heading.
-# Output goes to stdout.
+# Extract spec body: strip YAML frontmatter, the first '# Spec: …' heading,
+# and HTML comments (<!-- … -->). HTML-comment stripping is shared because
+# both Jira and YouTrack render the description as markdown/structured text;
+# template comments addressed to the spec author shouldn't appear in the
+# external system.
 # ---------------------------------------------------------------------------
 
 extract_body() {
@@ -79,6 +95,8 @@ if lines and lines[0].strip() == '---':
 body = '\n'.join(lines[i:])
 # Strip leading blank lines and the first '# Spec: …' heading if present.
 body = re.sub(r'\A\s*# Spec:[^\n]*\n', '', body)
+# Strip HTML comments (multi-line aware).
+body = re.sub(r'<!--.*?-->', '', body, flags=re.DOTALL)
 sys.stdout.write(body)
 PY
 }
@@ -488,9 +506,128 @@ elif isinstance(desc, str):
     ;;
 
   youtrack)
-    echo "Error: youtrack publish is not implemented yet." >&2
-    echo "       implement md_to_youtrack + REST push when needed." >&2
-    exit 1
+    if ! command -v curl >/dev/null 2>&1; then
+      echo "Error: 'curl' is not on PATH (required for YouTrack)." >&2
+      exit 1
+    fi
+
+    BASE_URL="$(cfg_get sources.youtrack.base_url)"
+    TOKEN_ENV="$(cfg_get sources.youtrack.token_env)"
+    [ -z "$TOKEN_ENV" ] && TOKEN_ENV="YOUTRACK_TOKEN"
+
+    if [ -z "$BASE_URL" ]; then
+      echo "Error: sources.youtrack.base_url is not set in .sdd/config.json" >&2
+      echo "       expected the instance root (e.g. https://myteam.youtrack.cloud)" >&2
+      echo "       — no trailing slash, no /api suffix." >&2
+      exit 1
+    fi
+
+    # Defensive: trim a single trailing slash if the user kept it.
+    BASE_URL="${BASE_URL%/}"
+
+    # Indirect env-var lookup (bash 3.2 compatible — no ${!var} expansion).
+    eval "TOKEN=\${$TOKEN_ENV:-}"
+    if [ -z "$TOKEN" ]; then
+      echo "Error: \$$TOKEN_ENV is empty." >&2
+      echo "       set it to a valid YouTrack permanent token, then retry." >&2
+      exit 1
+    fi
+
+    REF="$SPEC_ID"
+    CACHE_FILE="$CACHE_DIR/$REF.youtrack.md"
+    mkdir -p "$CACHE_DIR"
+
+    BODY_MD="$(extract_body "$SPEC_FILE")"
+
+    RESP_FILE="$(mktemp)"
+    REQ_FILE="$(mktemp)"
+    trap 'rm -f "$RESP_FILE" "$REQ_FILE"' EXIT
+
+    # ---------- Drift detection ----------------------------------------
+    if [ -f "$CACHE_FILE" ]; then
+      http_code="$(curl -sS -o "$RESP_FILE" -w '%{http_code}' \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Accept: application/json" \
+          "$BASE_URL/api/issues/$REF?fields=description" 2>/dev/null || echo "000")"
+
+      if [ "$http_code" = "401" ] || [ "$http_code" = "403" ]; then
+        echo "Error: YouTrack auth failed (HTTP $http_code)." >&2
+        echo "       set \$$TOKEN_ENV to a valid permanent token, then retry." >&2
+        exit 1
+      fi
+
+      if [ "$http_code" = "200" ]; then
+        remote_desc="$(python3 -c "
+import json, sys
+try:
+    with open('$RESP_FILE') as f:
+        d = json.load(f)
+except Exception:
+    sys.exit(0)
+print(d.get('description') or '')
+" 2>/dev/null || true)"
+        cached="$(cat "$CACHE_FILE" 2>/dev/null || true)"
+        if [ -n "$remote_desc" ] && [ "$remote_desc" != "$cached" ]; then
+          echo "──────────────────────────────────────"
+          echo "Drift detected on $REF — remote has changed since last sync."
+          echo "──────────────────────────────────────"
+          diff -u <(printf '%s\n' "$cached") <(printf '%s\n' "$remote_desc") || true
+          echo "──────────────────────────────────────"
+          printf 'Type "continue" to overwrite remote with local body, anything else to abort: '
+          read -r answer < /dev/tty || answer=""
+          if [ "$answer" != "continue" ]; then
+            echo "Aborted."
+            exit 1
+          fi
+        fi
+      fi
+    fi
+
+    # ---------- Build request JSON via python3 (safe escaping) ---------
+    printf '%s' "$BODY_MD" | python3 -c "
+import json, sys
+body = sys.stdin.read()
+print(json.dumps({'description': body}))
+" > "$REQ_FILE"
+
+    # ---------- Push (POST acts as PATCH for existing issues) ----------
+    http_code="$(curl -sS -o "$RESP_FILE" -w '%{http_code}' \
+        -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -H "Accept: application/json" \
+        "$BASE_URL/api/issues/$REF" \
+        --data-binary "@$REQ_FILE" 2>/dev/null || echo "000")"
+
+    case "$http_code" in
+      200|204)
+        : # success
+        ;;
+      401|403)
+        echo "Error: YouTrack auth failed (HTTP $http_code)." >&2
+        echo "       set \$$TOKEN_ENV to a valid permanent token, then retry." >&2
+        exit 1
+        ;;
+      404)
+        echo "Error: YouTrack issue $REF not found (HTTP 404)." >&2
+        exit 1
+        ;;
+      000)
+        echo "Error: could not reach $BASE_URL (network or curl failure)." >&2
+        exit 1
+        ;;
+      *)
+        echo "Error: YouTrack push failed (HTTP $http_code)." >&2
+        cat "$RESP_FILE" >&2 2>/dev/null || true
+        echo >&2
+        exit 1
+        ;;
+    esac
+
+    # ---------- Cache the markdown we pushed ---------------------------
+    printf '%s' "$BODY_MD" > "$CACHE_FILE"
+
+    echo "Published $REF to YouTrack."
     ;;
 
   *)
