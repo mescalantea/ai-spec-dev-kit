@@ -40,8 +40,9 @@ The toolkit enforces the split by shipping four distinct slash commands, one per
 - **Bash** 3.2+ (macOS default) or any modern bash on Linux. The scripts declare `#!/usr/bin/env bash`, so they run under bash regardless of your login shell (zsh, bash, fish — all fine).
 - **Git** — the toolkit manages branches per spec.
 - **Claude Code** CLI.
-- **`python3`** — required by `sdd publish` (config parsing + markdown → wiki conversion). Already present on macOS and most Linux distros.
-- **Atlassian CLI (`acli`)** — only if you publish to Jira (`sdd publish <SPEC-ID>` with `"source": "jira"`). Run `acli auth login` once before publishing.
+- **`python3`** — required by `sdd publish` (config parsing + markdown → ADF conversion). Already present on macOS and most Linux distros.
+- **`markdown-it-py`** — only if you publish to Jira. Install with `pip3 install --user markdown-it-py` (or in a venv if your Python is externally managed). The publish script prints the install hint when the module is missing.
+- **Atlassian CLI (`acli`)** — only if you publish to Jira (`sdd publish <SPEC-ID>` with `"source": "jira"`). Run `acli auth login` once before publishing. The script targets `--key <REF>` form per `acli jira workitem edit --help`.
 - **`curl`** — only if you publish to YouTrack (currently a stub — implement when needed).
 
 ---
@@ -191,12 +192,18 @@ Then run `acli auth login` (Jira) and you're ready.
 | Source | Status | Requires |
 |---|---|---|
 | `local` | Default | nothing — `sdd publish` is a no-op |
-| `jira` | Working | Atlassian CLI (`acli`) + `acli auth login`. Uses positional refs (`acli jira workitem edit <ref> --description-file=…`). |
+| `jira` | Working | `acli` (with `acli auth login` done once) + `markdown-it-py`. Converts the spec body to ADF JSON and pushes via `acli jira workitem edit --key <ref> --description-file=…`. |
 | `youtrack` | Stub | not implemented yet |
+
+### Why ADF (and not markdown or wiki markup)?
+
+Jira Cloud's description field is **ADF-only** (Atlassian Document Format — structured JSON). When you feed `acli --description-file` plain markdown or wiki markup, `acli` wraps the file content into a single ADF text node and Jira renders it verbatim — `###` shows as `###`, `[ ]` shows as `[ ]`. The only way to get headings, checkboxes, code blocks, and tables to render is to send structured ADF.
+
+`sdd publish` does that conversion locally via `markdown-it-py`, then pushes the ADF JSON.
 
 ### Drift detection
 
-`sdd publish` writes a cache at `.sdd/specs/.cache/<spec_id>.<source>.md` (gitignored) on every successful push. On the next push it pulls the remote, diffs against this cache, and if the remote has drifted you're shown a diff and asked to type `continue` before any overwrite.
+`sdd publish` writes a cache at `.sdd/specs/.cache/<spec_id>.jira.json` (gitignored) holding the ADF document we last pushed. On the next push the script pulls the remote ADF, canonicalizes both sides, and gates on equality. If the remote has changed you're warned and asked to type `continue` before overwrite. ADF JSON diffs aren't human-readable, so the script doesn't show one — inspect the issue in Jira directly to see what changed.
 
 ---
 
