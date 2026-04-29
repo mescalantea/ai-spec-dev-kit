@@ -41,9 +41,36 @@ The toolkit enforces the split by shipping four distinct slash commands, one per
 - **Git** — the toolkit manages branches per spec.
 - **Claude Code** CLI.
 - **`python3`** — required by `sdd publish` (config parsing, markdown → ADF conversion, JSON body construction). Already present on macOS and most Linux distros.
-- **`markdown-it-py`** — only if you publish to Jira. Install with `pip3 install --user markdown-it-py` (or in a venv if your Python is externally managed). The publish script prints the install hint when the module is missing.
+- **`markdown-it-py`** — only if you publish to Jira. Install instructions below.
 - **Atlassian CLI (`acli`)** — only if you publish to Jira (`sdd publish <SPEC-ID>` with `"source": "jira"`). Run `acli auth login` once before publishing. The script targets `--key <REF>` form per `acli jira workitem edit --help`.
 - **`curl`** — only if you publish to YouTrack. Set the `YOUTRACK_TOKEN` env var (or whatever `sources.youtrack.token_env` is configured to) to a permanent YouTrack token before running `sdd publish`.
+
+### Installing `markdown-it-py`
+
+For most setups:
+
+```bash
+pip3 install --user markdown-it-py
+```
+
+If your Python is externally managed (Homebrew Python on macOS, Debian/Ubuntu's system Python — anything that follows [PEP 668](https://peps.python.org/pep-0668/)), `pip3` will refuse with `error: externally-managed-environment`. Use a venv instead:
+
+```bash
+python3 -m venv ~/.sdd/venv
+~/.sdd/venv/bin/pip install markdown-it-py
+```
+
+Then make `sdd publish` pick up the venv's python. Either:
+
+```bash
+# Option A — point your shell PATH at the venv's bin dir for sdd sessions:
+export PATH="$HOME/.sdd/venv/bin:$PATH"
+
+# Option B — add an alias / wrapper that wraps sdd-publish:
+alias sdd-publish-venv='PATH="$HOME/.sdd/venv/bin:$PATH" sdd publish'
+```
+
+The publish script prints the install hint automatically when the module is missing, so you'll see this prompt only on the first push attempt.
 
 ---
 
