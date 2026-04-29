@@ -106,11 +106,17 @@ _advise_reinit() {
   fi
 
   if command -v python3 >/dev/null 2>&1; then
-    project_sha=$(python3 -c "import json,sys
+    # Pass the config path as argv (sys.argv[1]) instead of interpolating
+    # it into the python source — defends against quote-injection if the
+    # project path contains a single quote.
+    project_sha=$(python3 -c '
+import json, sys
 try:
-    print(json.load(open('$config')).get('sdd_version') or '')
+    with open(sys.argv[1], encoding="utf-8") as f:
+        print(json.load(f).get("sdd_version") or "")
 except Exception:
-    pass" 2>/dev/null || echo "")
+    pass
+' "$config" 2>/dev/null || echo "")
   else
     project_sha=""
   fi
