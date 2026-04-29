@@ -6,7 +6,7 @@
 #
 # Reads .sdd/config.json's `source` field and dispatches:
 #   local    -> no-op (prints hint, exits 0)
-#   jira     -> markdown -> Jira wiki conversion + acli push (positional ref; fixes #21)
+#   jira     -> markdown -> Jira wiki conversion + acli push (--key form, per acli help)
 #   youtrack -> stub (not implemented)
 #
 # Errors print verbatim. AI is only invoked if the user asks it to interpret a failure.
@@ -210,7 +210,7 @@ case "$SOURCE" in
 
     # Drift detection: compare current remote against last-known cache.
     if [ -f "$CACHE_FILE" ]; then
-      remote_json="$(acli jira workitem view "$REF" --json 2>/dev/null || true)"
+      remote_json="$(acli jira workitem view --key "$REF" --json 2>/dev/null || true)"
       if [ -n "$remote_json" ]; then
         remote_desc="$(printf '%s' "$remote_json" | python3 -c "
 import json, sys
@@ -241,8 +241,9 @@ print(d.get('description') or d.get('fields', {}).get('description') or '')
     trap 'rm -f "$TMP_FILE"' EXIT
     printf '%s' "$BODY_MD" | md_to_jira > "$TMP_FILE"
 
-    # Positional ref, no --key. Fixes issue #21 (acli flag was renamed upstream).
-    if ! acli jira workitem edit "$REF" --description-file="$TMP_FILE"; then
+    # Use --key per the acli help: `acli jira workitem edit --key "KEY-1" ...`.
+    # The `acli --version` print on failure helps spot upstream flag drift.
+    if ! acli jira workitem edit --key "$REF" --description-file="$TMP_FILE"; then
       echo "Error: acli push failed for $REF." >&2
       acli --version 2>/dev/null || true
       exit 1
