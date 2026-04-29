@@ -18,22 +18,20 @@ The toolkit enforces the split by shipping four distinct slash commands, one per
 
 - **Spec template** — Markdown template with YAML frontmatter (`.sdd/specs/template/spec.md`). Covers Context, Summary, Functional Requirements, Non-Goals, Edge Cases, Acceptance Criteria, Open Questions, Dependencies, Success Metrics, Testing Guidelines.
 - **Four slash commands** for Claude Code — `/spec-draft`, `/spec-plan`, `/spec-build`, `/spec-status`.
-- **`spec-source` skill** — reusable pull / adapt / push / conflict-detection across spec backends (`local`, `jira`, `youtrack`, extensible to Linear / GitHub Issues).
-- **`spec-caveman` skill** — terse-response style that auto-activates inside SDD commands to cut token usage without losing technical substance. Commits and PRs are never compressed.
-- **Adapter catalog** (`.sdd/sources.md`) — agent-neutral description of each source's wire calls.
-- **`sdd` CLI** (`scripts/sdd.sh`) — global facade with subcommands: `init`, `upgrade`, `version`, `help`.
-- **Setup wizard** (`scripts/setup.sh`) — POSIX bash, macOS + Linux. Copies commands, skills, template, and generates `.sdd/config.json` from your answers. Invoked via `sdd init`.
+- **`sdd publish`** — pure-bash command that pushes a local spec to its configured external source (Jira today; YouTrack stub). Lives outside Claude's context — zero tokens on the happy path.
+- **`sdd` CLI** (`scripts/sdd.sh`) — global facade with subcommands: `init`, `upgrade`, `version`, `publish`, `uninstall`, `help`.
+- **Setup wizard** (`scripts/setup.sh`) — POSIX bash, macOS + Linux. Copies commands, template, and generates `.sdd/config.json` (records the toolkit version). Invoked via `sdd init`.
 - **Installer** (`scripts/install.sh`) — symlinks `sdd` onto PATH and installs the auto-update shell hook.
 
 ---
 
 ## 🧠 Goals
 
-- Make specs the **single source of truth**, whether they live in the repo (`.sdd/specs/<id>.md`) or an external system (Jira, YouTrack, more adapters later). Either way, the local Markdown file is the canonical working copy.
+- Make the local Markdown file under `.sdd/specs/` the **single source of truth** during the build. External systems (Jira, YouTrack) are pushed to via `sdd publish` when the user explicitly asks — never automatically.
 - Enforce a **multi-step flow with human review** — draft, plan, build — so AI never jumps straight to code.
-- Support **non-linear iteration** — each phase can be re-entered as requirements shift, preserving history and marking obsolete steps instead of deleting them.
-- Stay **agent-neutral where it matters** — sources, config, and template live outside `.claude/` so other agents can plug in later.
-- Be **token-efficient** — the `spec-caveman` skill compresses prose automatically inside SDD commands.
+- Support **non-linear iteration** — each phase can be re-entered as requirements shift. Re-plans delete invalidated steps outright; numbering never renumbers, so gaps mark where superseded work used to live.
+- Stay **agent-neutral where it matters** — config and template live outside `.claude/` so other agents can plug in later.
+- Be **token-efficient** — the `/spec-*` commands carry a single one-line brevity directive; external source sync moves to a shell script, so adapter machinery costs zero tokens on the happy path.
 
 ---
 
@@ -42,8 +40,9 @@ The toolkit enforces the split by shipping four distinct slash commands, one per
 - **Bash** 3.2+ (macOS default) or any modern bash on Linux. The scripts declare `#!/usr/bin/env bash`, so they run under bash regardless of your login shell (zsh, bash, fish — all fine).
 - **Git** — the toolkit manages branches per spec.
 - **Claude Code** CLI.
-- **Atlassian CLI (`acli`)** — only if you enable the Jira source. Run `acli auth login` once before using Jira-backed specs.
-- **`curl` + `jq` (or `python3`)** — only if you enable the YouTrack source. Set the `YOUTRACK_TOKEN` env var to a permanent YouTrack token.
+- **`python3`** — required by `sdd publish` (config parsing + markdown → wiki conversion). Already present on macOS and most Linux distros.
+- **Atlassian CLI (`acli`)** — only if you publish to Jira (`sdd publish <SPEC-ID>` with `"source": "jira"`). Run `acli auth login` once before publishing.
+- **`curl`** — only if you publish to YouTrack (currently a stub — implement when needed).
 
 ---
 
@@ -77,15 +76,16 @@ sdd init
 The wizard:
 
 - copies `/spec-*` slash commands into `.claude/commands/`
-- copies the `spec-source` and `spec-caveman` skills into `.claude/skills/`
-- creates `.sdd/` with `sources.md` and `config.json`
+- creates `.sdd/` with `config.json` (records the toolkit short SHA in `sdd_version`)
 - copies the spec template into `.sdd/specs/template/spec.md`
-- creates `.sdd/specs/.cache/` and adds it to `.gitignore`
-- asks whether to enable Jira; if yes, collects the project key and `acli` workspace
-- asks whether to enable YouTrack; if yes, collects the base URL, project key, and token env var name
-- asks whether to gitignore the toolkit directories (`.sdd/`, `.claude/commands/`, `.claude/skills/`) — default no (commit by default)
+- creates `.sdd/specs/.cache/` for publish state
+- always gitignores the SDD-specific globs `.claude/commands/spec-*.md`, `.claude/skills/spec-*/`, and `.sdd/specs/.cache/` — your own commands/skills under `.claude/` are left alone
+- asks whether to track `.sdd/` specs in git (default Yes)
+- asks whether to include Claude as a co-author in commits (default Yes)
 
-Re-run `sdd init` any time to reinitialize — existing files are overwritten. `.sdd/specs/<id>.md` files and `.sdd/specs/.cache/` contents are left untouched.
+The wizard does **not** prompt for source/Jira/YouTrack config. Source defaults to `local`. To publish to Jira, edit `.sdd/config.json`'s `source` field and `sources.jira` block, then run `sdd publish <SPEC-ID>`.
+
+Re-run `sdd init` any time to reinitialize — existing files are overwritten. `.sdd/specs/<id>.md` files and `.sdd/specs/.cache/` contents are left untouched. `sdd_version` is rewritten on every `sdd init`.
 
 ---
 
@@ -96,6 +96,7 @@ Re-run `sdd init` any time to reinitialize — existing files are overwritten. `
 | `sdd init` | Initialize or re-initialize the SDD toolkit in the current project |
 | `sdd upgrade` | Pull the latest toolkit changes from the remote repository |
 | `sdd version` | Show installed version (commit hash) and latest available |
+| `sdd publish <id>` | Push a local spec to its configured external source (Jira) |
 | `sdd uninstall` | Remove the `sdd` CLI symlink and shell hook |
 | `sdd help` | Show available commands |
 
@@ -110,7 +111,14 @@ Install now? [Y/n]:
 
 Press Enter or `Y` to update (runs `git pull`). Press `N` to skip. The check runs at most once every 24 hours.
 
-If you’re in a directory with `.sdd/` (an SDD-enabled project), the hook also reminds you:
+If you're in a directory with `.sdd/` (an SDD-enabled project), the hook also compares the project's recorded `sdd_version` against the toolkit's current short SHA. When they differ:
+
+```
+  [sdd] this project was initialised with abc1234; toolkit is at def5678
+  [sdd] run "sdd init" here to refresh.
+```
+
+When `sdd_version` is missing (older config), it falls back to the generic tip:
 
 ```
   Tip: Run "sdd init" to apply toolkit updates to this project.
@@ -139,43 +147,56 @@ All commands are invoked inside Claude Code:
 /spec-build PAR-224
 ```
 
-`/spec-draft` creates the feature branch, pulls the description from the source (Jira, or an empty template for `local`), and writes `.sdd/specs/PAR-224.md`. `/spec-plan` analyzes the codebase, asks you to resolve open questions, and appends an Implementation Plan. `/spec-build` walks the plan step by step, pausing after each so you can review before it commits.
+`/spec-draft` asks whether to create a new branch (default Yes; press `n` to stay on the current branch), then writes an empty-template `.sdd/specs/PAR-224.md` for you to fill. `/spec-plan` analyzes the codebase, asks you to resolve open questions, and appends an Implementation Plan. `/spec-build` walks the plan step by step, pausing after each so you can review before it commits. To sync the spec to Jira, run `sdd publish PAR-224` separately when you're ready.
 
 ### Non-linear iteration
 
 Real work isn't linear. The commands are designed for re-entry:
 
-- **Refresh the spec** — run `/spec-draft <id> ...` again on an existing spec. Branch creation is skipped, the body is re-pulled from the source, and local-only sections (`Clarifications`, `Analysis`, `Implementation Plan`) are preserved. You're warned if they may now be stale.
-- **Re-plan after feedback** — run `/spec-plan <id> <what changed and why>`. The `changes` argument is **required** on re-runs. Checked steps still valid are kept; invalidated checked steps are rewritten with a strikethrough and `_(superseded: <reason>)_` marker; obsolete unchecked steps are removed; new work is appended continuing the step numbering.
+- **Refresh the spec** — run `/spec-draft <id> ...` again on an existing spec. The branch prompt is skipped, the body template is rewritten, and local-only sections (`Clarifications`, `Analysis`, `Implementation Plan`) are preserved.
+- **Re-plan after feedback** — run `/spec-plan <id> <what changed and why>`. The `changes` argument is **required** on re-runs. Checked steps still valid are kept; **invalidated steps are deleted outright** (numbering never renumbers — gaps are intentional and indicate where superseded work used to live). The reason for each deletion is recorded as one of ≤3 Clarifications bullets per re-run. New work is appended continuing the step numbering.
 - **Resume a build** — `/spec-build <id>` always picks up at the next unchecked step, including after a re-plan.
-- **Check where you are** — `/spec-status <id>` (or no ID for a table of all specs) shows the current phase (`drafted` / `planned` / `building` / `done`), progress counts, source sync state, and the next command to run.
+- **Check where you are** — `/spec-status <id>` (or no ID for a table of all specs) shows the current phase (`drafted` / `planned` / `building` / `done`), progress counts, and the next command to run.
 
 ### Commit style
 
-`/spec-build` commits each step individually with a message like `<spec_id>: step N - <short description>`. Commit messages and PR bodies are **not** compressed by the caveman skill — your repo's conventions (including any `Co-Authored-By` footer) are preserved.
+`/spec-build` commits each step individually with a message like `<spec_id>: step N - <short description>`. Commit messages and PR bodies are not compressed — your repo's conventions (including any `Co-Authored-By` footer) are preserved.
 
 ---
 
-## 🔌 Spec sources
+## 🔌 Publishing specs to external systems
 
-Specs can come from multiple backends. Each backend implements a simple four-operation contract (`pull`, `adapt`, `push`, `detect_conflict`) described in `.sdd/sources.md`. The `spec-source` skill is the single point of entry — commands delegate all external I/O to it.
+Specs are authored locally — the Markdown file under `.sdd/specs/<id>.md` is the working copy. To sync a spec to an external system, run `sdd publish <SPEC-ID>`. The publish step is **separate from `/spec-build`**: nothing happens automatically.
 
-### Built-in adapters
+### Configuring a source
 
-| Source | Requires | Notes |
+Edit `.sdd/config.json`:
+
+```json
+{
+  "source": "jira",
+  "sources": {
+    "jira": {
+      "project_key": "PAR",
+      "workspace": "your-workspace"
+    }
+  }
+}
+```
+
+Then run `acli auth login` (Jira) and you're ready.
+
+### Built-in sources
+
+| Source | Status | Requires |
 |---|---|---|
-| `local` | nothing | Default. The Markdown file under `.sdd/specs/` IS the source of truth. |
-| `jira` | Atlassian CLI (`acli`) + prior `acli auth login` | `/spec-draft` pulls the description, adapts it to the template (asking you to review), and caches it. `/spec-plan` and `/spec-build` push the updated body back at the end, after detecting any external drift and asking for confirmation. |
-| `youtrack` | `curl`, `jq` or `python3`, `YOUTRACK_TOKEN` env var | Same lifecycle as Jira. Uses the YouTrack REST API directly — no CLI dependency. Set `YOUTRACK_TOKEN` to a permanent YouTrack token. `base_url` in config must be the instance root with no trailing slash (e.g. `https://myteam.youtrack.cloud`). |
+| `local` | Default | nothing — `sdd publish` is a no-op |
+| `jira` | Working | Atlassian CLI (`acli`) + `acli auth login`. Uses positional refs (`acli jira workitem edit <ref> --description-file=…`). |
+| `youtrack` | Stub | not implemented yet |
 
-Conflict detection uses a cache at `.sdd/specs/.cache/<spec_id>.<source>.md` (gitignored). If the remote has drifted since the last sync, you're shown a diff and asked to type `continue` before any overwrite.
+### Drift detection
 
-### Adding a new source
-
-1. Add a section to `.sdd/sources.md` describing the adapter's pull/push wire calls.
-2. Add a key under `sources` in `.sdd/config.json` with its configuration (project key, workspace, token env, etc.).
-
-No command or skill changes needed — the skill reads the catalog at runtime.
+`sdd publish` writes a cache at `.sdd/specs/.cache/<spec_id>.<source>.md` (gitignored) on every successful push. On the next push it pulls the remote, diffs against this cache, and if the remote has drifted you're shown a diff and asked to type `continue` before any overwrite.
 
 ---
 
@@ -186,16 +207,13 @@ No command or skill changes needed — the skill reads the catalog at runtime.
 ├── ai/
 │   └── claude/
 │       ├── commands/           # /spec-draft, /spec-plan, /spec-build, /spec-status
-│       └── skills/
-│           ├── spec-source/    # Source I/O adapter skill
-│           └── spec-caveman/   # Terse-response style skill
-├── sdd/
-│   └── sources.md              # Source adapter catalog (agent-neutral)
+│       └── skills/             # (none ship today)
 ├── templates/
 │   └── spec.md                 # Spec template with YAML frontmatter
 ├── scripts/
 │   ├── sdd.sh                  # CLI facade (symlinked as `sdd`)
 │   ├── setup.sh                # Wizard invoked by `sdd init`
+│   ├── sdd-publish.sh          # `sdd publish <id>` — push to Jira/YouTrack
 │   ├── install.sh              # Installs `sdd` on PATH + shell hook
 │   ├── uninstall.sh            # Removes `sdd` from PATH + shell hook
 │   └── check-update.sh         # Auto-update check run by the shell hook
@@ -209,13 +227,9 @@ Layout inside a target project after running the wizard:
 ```
 your-project/
 ├── .claude/
-│   ├── commands/               # spec-draft, spec-plan, spec-build, spec-status
-│   └── skills/
-│       ├── spec-source/
-│       └── spec-caveman/
+│   └── commands/               # spec-draft, spec-plan, spec-build, spec-status
 └── .sdd/
-    ├── config.json             # Wizard-generated source config
-    ├── sources.md              # Adapter catalog
+    ├── config.json             # Wizard-generated config (sdd_version, source, etc.)
     └── specs/
         ├── template/spec.md    # Spec template
         ├── .cache/             # Last-known remote state (gitignored)
@@ -226,7 +240,7 @@ your-project/
 
 ## 🔄 Updating / reinitializing
 
-- **Toolkit update** — run `sdd upgrade`, then `sdd init` in each target project. Existing commands, skills, template, and `sources.md` are overwritten; your specs and config are not.
+- **Toolkit update** — run `sdd upgrade`, then `sdd init` in each target project. Existing commands and template are overwritten; your specs and the rest of `config.json` are not (only `sdd_version` is rewritten).
 - **Reset a single project** — delete `.claude/commands/spec-*.md`, `.claude/skills/spec-*/`, `.sdd/`, then re-run `sdd init`.
 - **Move off the toolkit** — `.sdd/specs/` is just Markdown; it keeps working without the commands.
 - **Legacy `.specs/` directory** — if you have spec files from an older install under `.specs/`, the wizard leaves them untouched. Move them to `.sdd/specs/` manually after reinitializing.
@@ -261,15 +275,6 @@ If you prefer to add the hook line yourself rather than running `scripts/install
 ```
 
 Replace `/path/to/ai-spec-dev-kit` with the absolute path to your clone.
-
----
-
-## 🙏 Credits & attribution
-
-The `spec-caveman` skill is adapted from **Julius Brussee's `caveman`** project:
-<https://github.com/JuliusBrussee/caveman> — MIT License.
-
-The fork reduces the feature set to a single level (`lite`), wires it to auto-activate inside the SDD command lifecycle, and adds exceptions so git commit messages, PR bodies, and verbatim user prompts are never compressed. All credit for the original compression rules and intensity-level design goes to the upstream author.
 
 ---
 
