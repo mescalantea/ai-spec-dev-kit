@@ -51,7 +51,7 @@ cfg_get() {
 import json, sys
 path, key = sys.argv[1], sys.argv[2]
 try:
-    with open(path) as f:
+    with open(path, encoding='utf-8') as f:
         cfg = json.load(f)
 except Exception:
     sys.exit(0)
@@ -81,7 +81,7 @@ extract_body() {
   python3 - "$1" <<'PY'
 import sys, re
 path = sys.argv[1]
-with open(path) as f:
+with open(path, encoding='utf-8') as f:
     text = f.read()
 # Strip frontmatter (between first two '---' lines).
 lines = text.splitlines()
@@ -449,10 +449,14 @@ case "$SOURCE" in
     # Drift detection: compare current remote ADF (canonicalized) against the
     # canonical form of what we last pushed. ADF is structured JSON, so a
     # textual diff would be unreadable — we just gate on equality.
+    # If `acli` fails (auth, network, transient API error), we WARN and ask the
+    # user to confirm the push instead of silently skipping the drift check.
     if [ -f "$CACHE_FILE" ]; then
-      remote_json="$(acli jira workitem view --key "$REF" --json 2>/dev/null || true)"
-      if [ -n "$remote_json" ]; then
-        remote_desc_canonical="$(printf '%s' "$remote_json" | python3 -c "
+      view_err="$(mktemp)"
+      if remote_json="$(acli jira workitem view --key "$REF" --json 2>"$view_err")"; then
+        rm -f "$view_err"
+        if [ -n "$remote_json" ]; then
+          remote_desc_canonical="$(printf '%s' "$remote_json" | python3 -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -470,18 +474,33 @@ elif isinstance(desc, str):
                                    'content': [{'type': 'text', 'text': desc}]}]},
                      sort_keys=True, separators=(',', ':')))
 " 2>/dev/null || true)"
-        cached_canonical="$(printf '%s' "$(cat "$CACHE_FILE")" | canonicalize_adf 2>/dev/null || true)"
-        if [ -n "$remote_desc_canonical" ] && [ "$remote_desc_canonical" != "$cached_canonical" ]; then
-          echo "──────────────────────────────────────"
-          echo "Drift detected on $REF — the Jira description has changed since the last sdd publish."
-          echo "(ADF JSON diffs are not human-readable; inspect the issue in Jira directly.)"
-          echo "──────────────────────────────────────"
-          printf 'Type "continue" to overwrite remote with local body, anything else to abort: '
-          read -r answer < /dev/tty || answer=""
-          if [ "$answer" != "continue" ]; then
-            echo "Aborted."
-            exit 1
+          cached_canonical="$(printf '%s' "$(cat "$CACHE_FILE")" | canonicalize_adf 2>/dev/null || true)"
+          if [ -n "$remote_desc_canonical" ] && [ "$remote_desc_canonical" != "$cached_canonical" ]; then
+            echo "──────────────────────────────────────"
+            echo "Drift detected on $REF — the Jira description has changed since the last sdd publish."
+            echo "(ADF JSON diffs are not human-readable; inspect the issue in Jira directly.)"
+            echo "──────────────────────────────────────"
+            printf 'Type "continue" to overwrite remote with local body, anything else to abort: '
+            read -r answer < /dev/tty || answer=""
+            if [ "$answer" != "continue" ]; then
+              echo "Aborted."
+              exit 1
+            fi
           fi
+        fi
+      else
+        echo "──────────────────────────────────────" >&2
+        echo "Warning: could not fetch $REF from Jira for drift check." >&2
+        if [ -s "$view_err" ]; then
+          sed 's/^/  /' "$view_err" >&2
+        fi
+        echo "──────────────────────────────────────" >&2
+        rm -f "$view_err"
+        printf 'Type "continue" to push without drift detection, anything else to abort: '
+        read -r answer < /dev/tty || answer=""
+        if [ "$answer" != "continue" ]; then
+          echo "Aborted."
+          exit 1
         fi
       fi
     fi
@@ -525,6 +544,17 @@ elif isinstance(desc, str):
     # Defensive: trim a single trailing slash if the user kept it.
     BASE_URL="${BASE_URL%/}"
 
+    # Validate token_env before using it in `eval` — must be a valid env var
+    # name (letters, digits, underscore; cannot start with a digit). Defends
+    # against shell-injection if .sdd/config.json is hand-edited carelessly.
+    case "$TOKEN_ENV" in
+      [0-9]*|*[!A-Za-z0-9_]*)
+        echo "Error: invalid token_env value in .sdd/config.json: '$TOKEN_ENV'" >&2
+        echo "       must be a valid env var name (letters, digits, underscore)." >&2
+        exit 1
+        ;;
+    esac
+
     # Indirect env-var lookup (bash 3.2 compatible — no ${!var} expansion).
     eval "TOKEN=\${$TOKEN_ENV:-}"
     if [ -z "$TOKEN" ]; then
@@ -544,43 +574,63 @@ elif isinstance(desc, str):
     trap 'rm -f "$RESP_FILE" "$REQ_FILE"' EXIT
 
     # ---------- Drift detection ----------------------------------------
+    # On any non-200 / non-auth status (404, 5xx, 000-network) we WARN and
+    # ask the user to confirm the push instead of silently skipping the
+    # drift check — silent skip risks overwriting unseen remote changes.
     if [ -f "$CACHE_FILE" ]; then
       http_code="$(curl -sS -o "$RESP_FILE" -w '%{http_code}' \
           -H "Authorization: Bearer $TOKEN" \
           -H "Accept: application/json" \
           "$BASE_URL/api/issues/$REF?fields=description" 2>/dev/null || echo "000")"
 
-      if [ "$http_code" = "401" ] || [ "$http_code" = "403" ]; then
-        echo "Error: YouTrack auth failed (HTTP $http_code)." >&2
-        echo "       set \$$TOKEN_ENV to a valid permanent token, then retry." >&2
-        exit 1
-      fi
-
-      if [ "$http_code" = "200" ]; then
-        remote_desc="$(python3 -c "
+      case "$http_code" in
+        401|403)
+          echo "Error: YouTrack auth failed (HTTP $http_code) during drift check." >&2
+          echo "       set \$$TOKEN_ENV to a valid permanent token, then retry." >&2
+          exit 1
+          ;;
+        200)
+          remote_desc="$(python3 - "$RESP_FILE" <<'PY' 2>/dev/null || true
 import json, sys
 try:
-    with open('$RESP_FILE') as f:
+    with open(sys.argv[1], encoding='utf-8') as f:
         d = json.load(f)
 except Exception:
     sys.exit(0)
 print(d.get('description') or '')
-" 2>/dev/null || true)"
-        cached="$(cat "$CACHE_FILE" 2>/dev/null || true)"
-        if [ -n "$remote_desc" ] && [ "$remote_desc" != "$cached" ]; then
-          echo "──────────────────────────────────────"
-          echo "Drift detected on $REF — remote has changed since last sync."
-          echo "──────────────────────────────────────"
-          diff -u <(printf '%s\n' "$cached") <(printf '%s\n' "$remote_desc") || true
-          echo "──────────────────────────────────────"
-          printf 'Type "continue" to overwrite remote with local body, anything else to abort: '
+PY
+)"
+          cached="$(cat "$CACHE_FILE" 2>/dev/null || true)"
+          if [ -n "$remote_desc" ] && [ "$remote_desc" != "$cached" ]; then
+            echo "──────────────────────────────────────"
+            echo "Drift detected on $REF — remote has changed since last sync."
+            echo "──────────────────────────────────────"
+            diff -u <(printf '%s\n' "$cached") <(printf '%s\n' "$remote_desc") || true
+            echo "──────────────────────────────────────"
+            printf 'Type "continue" to overwrite remote with local body, anything else to abort: '
+            read -r answer < /dev/tty || answer=""
+            if [ "$answer" != "continue" ]; then
+              echo "Aborted."
+              exit 1
+            fi
+          fi
+          ;;
+        *)
+          echo "──────────────────────────────────────" >&2
+          echo "Warning: could not fetch $REF from YouTrack for drift check (HTTP $http_code)." >&2
+          if [ -s "$RESP_FILE" ]; then
+            sed 's/^/  /' "$RESP_FILE" >&2
+            echo >&2
+          fi
+          echo "──────────────────────────────────────" >&2
+          printf 'Type "continue" to push without drift detection, anything else to abort: '
           read -r answer < /dev/tty || answer=""
           if [ "$answer" != "continue" ]; then
             echo "Aborted."
             exit 1
           fi
-        fi
-      fi
+          ;;
+      esac
     fi
 
     # ---------- Build request JSON via python3 (safe escaping) ---------
@@ -625,7 +675,7 @@ print(json.dumps({'description': body}))
     esac
 
     # ---------- Cache the markdown we pushed ---------------------------
-    printf '%s' "$BODY_MD" > "$CACHE_FILE"
+    printf '%s\n' "$BODY_MD" > "$CACHE_FILE"
 
     echo "Published $REF to YouTrack."
     ;;
