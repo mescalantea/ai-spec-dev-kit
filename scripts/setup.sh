@@ -209,31 +209,74 @@ fi
 cp "$SRC_TEMPLATE" "$DST_TEMPLATE_DIR/spec.md"
 echo "  wrote $DST_TEMPLATE_DIR/spec.md"
 
-# Config. Source defaults to "local"; users who need Jira/YouTrack edit this file
-# directly and run `sdd publish <spec_id>` to sync.
-cat > "$DST_CONFIG" <<EOF
-{
-  "sdd_version": "$SDD_VERSION",
-  "claude_attribution": $CLAUDE_ATTRIBUTION,
-  "track_specs": $TRACK_SPECS,
-  "source": "local",
-  "sources": {
-    "local": {
-      "path": ".sdd/specs"
+# Config. We always rewrite `sdd_version`, `claude_attribution`, and
+# `track_specs` from the wizard's answers. We PRESERVE `source` and the
+# `sources.*` blocks from any existing config — re-running `sdd init`
+# should not wipe a user's Jira/YouTrack configuration.
+python3 - "$DST_CONFIG" "$SDD_VERSION" "$CLAUDE_ATTRIBUTION" "$TRACK_SPECS" <<'PY' > "$DST_CONFIG.tmp"
+import json, os, sys
+
+path, ver, attr, track = sys.argv[1:5]
+
+defaults = {
+    "sdd_version": ver,
+    "claude_attribution": attr == "true",
+    "track_specs": track == "true",
+    "source": "local",
+    "sources": {
+        "local":    {"path": ".sdd/specs"},
+        "jira":     {"project_key": "", "workspace": ""},
+        "youtrack": {"base_url": "", "token_env": "YOUTRACK_TOKEN", "project_id": ""},
     },
-    "jira": {
-      "project_key": "",
-      "workspace": ""
-    },
-    "youtrack": {
-      "base_url": "",
-      "token_env": "YOUTRACK_TOKEN",
-      "project_id": ""
-    }
-  }
 }
-EOF
+
+cfg = {}
+if os.path.isfile(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            loaded = json.load(f)
+            if isinstance(loaded, dict):
+                cfg = loaded
+    except Exception:
+        cfg = {}
+
+# Always-rewrite fields (the wizard owns these).
+cfg["sdd_version"] = defaults["sdd_version"]
+cfg["claude_attribution"] = defaults["claude_attribution"]
+cfg["track_specs"] = defaults["track_specs"]
+
+# Preserve `source` if previously set to a recognised value; otherwise default.
+if cfg.get("source") not in ("local", "jira", "youtrack"):
+    cfg["source"] = defaults["source"]
+
+# Merge sources: keep existing values, fill missing ones from defaults.
+src = cfg.setdefault("sources", {})
+if not isinstance(src, dict):
+    src = {}
+    cfg["sources"] = src
+for key, default_block in defaults["sources"].items():
+    cur = src.setdefault(key, {})
+    if not isinstance(cur, dict):
+        cur = {}
+        src[key] = cur
+    if isinstance(default_block, dict):
+        for k, v in default_block.items():
+            cur.setdefault(k, v)
+
+print(json.dumps(cfg, indent=2))
+PY
+mv "$DST_CONFIG.tmp" "$DST_CONFIG"
 echo "  wrote $DST_CONFIG"
+
+# Capture the source the merge ended up with (for the summary block below).
+SELECTED_SOURCE="$(python3 -c '
+import json, sys
+try:
+    with open(sys.argv[1], encoding="utf-8") as f:
+        print(json.load(f).get("source") or "local")
+except Exception:
+    print("local")
+' "$DST_CONFIG")"
 
 # Always-ignore: SDD-specific paths under .claude/ + the publish cache.
 # Scoped globs only — leave the user's own .claude/ content alone.
@@ -258,7 +301,7 @@ Done.
 Toolkit version:    $SDD_VERSION
 Claude attribution: $CLAUDE_ATTRIBUTION
 Track specs in git: $TRACK_SPECS
-Source:             local
+Source:             $SELECTED_SOURCE
 
 Commands available in Claude Code:
   /spec-draft  <SPEC-ID> <type> <title>
@@ -266,11 +309,26 @@ Commands available in Claude Code:
   /spec-build  <SPEC-ID>
   /spec-status [SPEC-ID]
 
-To sync a spec to Jira:
-  1) edit .sdd/config.json -> set "source": "jira" and fill sources.jira
-  2) run 'acli auth login' if you have not already
+EOF
+
+if [ "$SELECTED_SOURCE" = "local" ]; then
+  cat <<EOF
+To sync a spec to Jira or YouTrack:
+  1) edit .sdd/config.json — set "source" and fill the matching sources.* block
+  2) Jira: run 'acli auth login' once. YouTrack: export your token via the
+     env var named in sources.youtrack.token_env (defaults to YOUTRACK_TOKEN).
   3) run 'sdd publish <SPEC-ID>'
 
+EOF
+else
+  cat <<EOF
+Source preserved from existing .sdd/config.json. Run 'sdd publish <SPEC-ID>'
+to sync a spec to $SELECTED_SOURCE.
+
+EOF
+fi
+
+cat <<EOF
 Re-run 'sdd init' any time after 'sdd upgrade' to pick up changes.
 ────────────────────────────────────────────────────
 EOF
