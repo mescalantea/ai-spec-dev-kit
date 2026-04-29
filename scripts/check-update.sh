@@ -96,8 +96,31 @@ _check_update() {
 }
 
 # If the current directory contains .sdd/, advise the user to re-run sdd init.
+# When .sdd/config.json carries an `sdd_version` field, compare it against the
+# toolkit's current short SHA and print an explicit version mismatch line.
 _advise_reinit() {
-  if [ -d "$PWD/.sdd" ]; then
+  config="$PWD/.sdd/config.json"
+  if [ ! -f "$config" ]; then
+    [ -d "$PWD/.sdd" ] && printf '\n  Tip: Run "sdd init" to apply toolkit updates to this project.\n'
+    return 0
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    project_sha=$(python3 -c "import json,sys
+try:
+    print(json.load(open('$config')).get('sdd_version') or '')
+except Exception:
+    pass" 2>/dev/null || echo "")
+  else
+    project_sha=""
+  fi
+
+  toolkit_sha=$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo "")
+
+  if [ -n "$project_sha" ] && [ -n "$toolkit_sha" ] && [ "$project_sha" != "$toolkit_sha" ]; then
+    printf '\n  [sdd] this project was initialised with %s; toolkit is at %s\n' "$project_sha" "$toolkit_sha"
+    printf '  [sdd] run "sdd init" here to refresh.\n'
+  elif [ -z "$project_sha" ]; then
     printf '\n  Tip: Run "sdd init" to apply toolkit updates to this project.\n'
   fi
 }
