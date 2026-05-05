@@ -36,7 +36,6 @@ TARGET_DIR="$(pwd)"
 # Sources in the toolkit repo.
 SRC_COMMANDS="$REPO_ROOT/ai/claude/commands"
 SRC_SKILLS="$REPO_ROOT/ai/claude/skills"
-SRC_SOURCES_DOC="$REPO_ROOT/sdd/sources.md"
 SRC_TEMPLATE="$REPO_ROOT/templates/spec.md"
 
 # Destinations in the target project.
@@ -44,7 +43,6 @@ DST_CLAUDE="$TARGET_DIR/.claude"
 DST_COMMANDS="$DST_CLAUDE/commands"
 DST_SKILLS="$DST_CLAUDE/skills"
 DST_SDD="$TARGET_DIR/.sdd"
-DST_SOURCES_DOC="$DST_SDD/sources.md"
 DST_CONFIG="$DST_SDD/config.json"
 DST_TEMPLATE_DIR="$TARGET_DIR/.sdd/specs/template"
 DST_CACHE_DIR="$TARGET_DIR/.sdd/specs/.cache"
@@ -59,18 +57,8 @@ if [ ! -d "$SRC_COMMANDS" ]; then
   exit 1
 fi
 
-if [ ! -d "$SRC_SKILLS" ]; then
-  echo "Error: cannot find skills directory at $SRC_SKILLS" >&2
-  exit 1
-fi
-
 if [ ! -f "$SRC_TEMPLATE" ]; then
   echo "Error: cannot find spec template at $SRC_TEMPLATE" >&2
-  exit 1
-fi
-
-if [ ! -f "$SRC_SOURCES_DOC" ]; then
-  echo "Error: cannot find sources adapter doc at $SRC_SOURCES_DOC" >&2
   exit 1
 fi
 
@@ -137,7 +125,6 @@ copy_dir_contents() {
   src="$1"
   dst="$2"
   mkdir -p "$dst"
-  # Use cp -R on both macOS and Linux; copies files and nested dirs (skill folders).
   for entry in "$src"/* "$src"/.??*; do
     [ -e "$entry" ] || continue
     name="$(basename "$entry")"
@@ -161,13 +148,12 @@ Repo:    $REPO_ROOT
 Target:  $TARGET_DIR
 
 This will:
-  • copy slash commands into .claude/commands/
-  • copy skills into .claude/skills/
-  • create .sdd/ with sources.md and config.json
+  • copy /spec-* slash commands into .claude/commands/
+  • create .sdd/ with config.json (records the toolkit version)
   • copy the spec template into .sdd/specs/template/
-  • create .sdd/specs/.cache/ for source sync state
-  • add .sdd/specs/.cache/ to .gitignore
-  • (optional) gitignore .sdd/, .claude/commands/, .claude/skills/
+  • create .sdd/specs/.cache/ for publish state
+  • always gitignore .claude/commands/spec-*.md, .claude/skills/spec-*/, .sdd/specs/.cache/
+  • ask whether to track .sdd/ specs in git
 
 Existing files will be overwritten.
 ────────────────────────────────────────────────────
@@ -183,82 +169,19 @@ fi
 # Wizard questions.
 # ---------------------------------------------------------------------------
 
-echo
-echo "Source configuration"
-echo "--------------------"
-echo "Choose the spec source for this project:"
-echo "  1) local    — specs live only in .sdd/specs/ (no external sync)"
-echo "  2) jira     — sync specs with Jira issues via acli"
-echo "  3) youtrack — sync specs with YouTrack issues via REST API"
-echo
-
-SOURCE_CHOICE=""
-while :; do
-  SOURCE_CHOICE=$(prompt "Enter your choice (1/2/3)" "1")
-  case "$SOURCE_CHOICE" in
-    1) SELECTED_SOURCE="local";    break ;;
-    2) SELECTED_SOURCE="jira";     break ;;
-    3) SELECTED_SOURCE="youtrack"; break ;;
-    *) echo "Invalid choice. Please enter 1, 2, or 3." ;;
-  esac
-done
-
-JIRA_ENABLED=false
-JIRA_PROJECT_KEY=""
-JIRA_WORKSPACE=""
-YOUTRACK_ENABLED=false
-YOUTRACK_BASE_URL=""
-YOUTRACK_TOKEN_ENV="YOUTRACK_TOKEN"
-YOUTRACK_PROJECT_ID=""
-
-if [ "$SELECTED_SOURCE" = "jira" ]; then
-  JIRA_ENABLED=true
-  if ! command -v acli >/dev/null 2>&1; then
-    echo
-    echo "Warning: 'acli' (Atlassian CLI) is not on PATH."
-    echo "         You can continue — install it later via your package manager."
-    echo "         The Jira source commands will fail until acli is installed and authenticated."
-  fi
-  JIRA_PROJECT_KEY=$(prompt "Default Jira project key (e.g. PAR)" "")
-  JIRA_WORKSPACE=$(prompt "acli workspace" "")
-fi
-
-if [ "$SELECTED_SOURCE" = "youtrack" ]; then
-  YOUTRACK_ENABLED=true
-  if ! command -v curl >/dev/null 2>&1; then
-    echo
-    echo "Warning: 'curl' is not on PATH. The YouTrack adapter requires curl."
-  fi
-  if ! command -v jq >/dev/null 2>&1 && ! command -v python3 >/dev/null 2>&1; then
-    echo
-    echo "Warning: neither 'jq' nor 'python3' is on PATH."
-    echo "         The YouTrack adapter needs one of them for JSON extraction."
-  fi
-  YOUTRACK_BASE_URL=$(prompt "YouTrack base URL (e.g. https://myteam.youtrack.cloud — no trailing slash, no /api)" "")
-  YOUTRACK_TOKEN_ENV=$(prompt "Env var holding your YouTrack permanent token" "YOUTRACK_TOKEN")
-  if [ -n "$YOUTRACK_TOKEN_ENV" ] && [ -z "$(eval echo "\${${YOUTRACK_TOKEN_ENV}:-}")" ]; then
-    echo
-    echo "Warning: \$$YOUTRACK_TOKEN_ENV is not set in the current shell."
-    echo "         Set it before running /spec-draft or /spec-build with source: youtrack."
-  fi
-  YOUTRACK_PROJECT_ID=$(prompt "YouTrack project ID (optional, for future create-on-push)" "")
-fi
-
-echo
 CLAUDE_ATTRIBUTION=$(prompt_yn "Include Claude as a co-author in commits and PR bodies?" "y")
 
 echo
 echo "Version control"
 echo "---------------"
-echo "The toolkit directories can be kept local-only (gitignored) or committed."
-GITIGNORE_TOOLKIT=$(prompt_yn "Exclude toolkit from version control (.sdd/, .claude/commands/, .claude/skills/)?" "n")
+echo "Spec files under .sdd/specs/ can be committed alongside your code or kept local-only."
+TRACK_SPECS=$(prompt_yn "Track .sdd/ specs in git?" "y")
 
-# Derive track_specs (inverse of GITIGNORE_TOOLKIT) for config.json.
-if [ "$GITIGNORE_TOOLKIT" = "true" ]; then
-  TRACK_SPECS=false
-else
-  TRACK_SPECS=true
-fi
+# ---------------------------------------------------------------------------
+# Compute toolkit version (short SHA of REPO_ROOT HEAD).
+# ---------------------------------------------------------------------------
+
+SDD_VERSION="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")"
 
 # ---------------------------------------------------------------------------
 # Apply.
@@ -276,47 +199,93 @@ for f in "$SRC_COMMANDS"/*.md; do
   echo "  wrote $DST_COMMANDS/$(basename "$f")"
 done
 
-# Skills (nested directories).
-copy_dir_contents "$SRC_SKILLS" "$DST_SKILLS"
-
-# Source adapter doc.
-cp "$SRC_SOURCES_DOC" "$DST_SOURCES_DOC"
-echo "  wrote $DST_SOURCES_DOC"
+# Skills (nested directories). Only copy if any exist; the toolkit may ship without
+# any spec-* skills now that caveman/source have been removed.
+if [ -d "$SRC_SKILLS" ] && ls "$SRC_SKILLS"/spec-* >/dev/null 2>&1; then
+  copy_dir_contents "$SRC_SKILLS" "$DST_SKILLS"
+fi
 
 # Spec template.
 cp "$SRC_TEMPLATE" "$DST_TEMPLATE_DIR/spec.md"
 echo "  wrote $DST_TEMPLATE_DIR/spec.md"
 
-# Config.
-cat > "$DST_CONFIG" <<EOF
-{
-  "claude_attribution": $CLAUDE_ATTRIBUTION,
-  "track_specs": $TRACK_SPECS,
-  "source": "$SELECTED_SOURCE",
-  "sources": {
-    "local": {
-      "path": ".sdd/specs"
+# Config. We always rewrite `sdd_version`, `claude_attribution`, and
+# `track_specs` from the wizard's answers. We PRESERVE `source` and the
+# `sources.*` blocks from any existing config — re-running `sdd init`
+# should not wipe a user's Jira/YouTrack configuration.
+python3 - "$DST_CONFIG" "$SDD_VERSION" "$CLAUDE_ATTRIBUTION" "$TRACK_SPECS" <<'PY' > "$DST_CONFIG.tmp"
+import json, os, sys
+
+path, ver, attr, track = sys.argv[1:5]
+
+defaults = {
+    "sdd_version": ver,
+    "claude_attribution": attr == "true",
+    "track_specs": track == "true",
+    "source": "local",
+    "sources": {
+        "local":    {"path": ".sdd/specs"},
+        "jira":     {"project_key": "", "workspace": ""},
+        "youtrack": {"base_url": "", "token_env": "YOUTRACK_TOKEN", "project_id": ""},
     },
-    "jira": {
-      "project_key": "$JIRA_PROJECT_KEY",
-      "workspace": "$JIRA_WORKSPACE"
-    },
-    "youtrack": {
-      "base_url": "$YOUTRACK_BASE_URL",
-      "token_env": "$YOUTRACK_TOKEN_ENV",
-      "project_id": "$YOUTRACK_PROJECT_ID"
-    }
-  }
 }
-EOF
+
+cfg = {}
+if os.path.isfile(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            loaded = json.load(f)
+            if isinstance(loaded, dict):
+                cfg = loaded
+    except Exception:
+        cfg = {}
+
+# Always-rewrite fields (the wizard owns these).
+cfg["sdd_version"] = defaults["sdd_version"]
+cfg["claude_attribution"] = defaults["claude_attribution"]
+cfg["track_specs"] = defaults["track_specs"]
+
+# Preserve `source` if previously set to a recognised value; otherwise default.
+if cfg.get("source") not in ("local", "jira", "youtrack"):
+    cfg["source"] = defaults["source"]
+
+# Merge sources: keep existing values, fill missing ones from defaults.
+src = cfg.setdefault("sources", {})
+if not isinstance(src, dict):
+    src = {}
+    cfg["sources"] = src
+for key, default_block in defaults["sources"].items():
+    cur = src.setdefault(key, {})
+    if not isinstance(cur, dict):
+        cur = {}
+        src[key] = cur
+    if isinstance(default_block, dict):
+        for k, v in default_block.items():
+            cur.setdefault(k, v)
+
+print(json.dumps(cfg, indent=2))
+PY
+mv "$DST_CONFIG.tmp" "$DST_CONFIG"
 echo "  wrote $DST_CONFIG"
 
+# Capture the source the merge ended up with (for the summary block below).
+SELECTED_SOURCE="$(python3 -c '
+import json, sys
+try:
+    with open(sys.argv[1], encoding="utf-8") as f:
+        print(json.load(f).get("source") or "local")
+except Exception:
+    print("local")
+' "$DST_CONFIG")"
+
+# Always-ignore: SDD-specific paths under .claude/ + the publish cache.
+# Scoped globs only — leave the user's own .claude/ content alone.
+ensure_gitignore_line ".claude/commands/spec-*.md"
+ensure_gitignore_line ".claude/skills/spec-*/"
 ensure_gitignore_line ".sdd/specs/.cache/"
 
-if [ "$GITIGNORE_TOOLKIT" = "true" ]; then
+if [ "$TRACK_SPECS" = "false" ]; then
   ensure_gitignore_line ".sdd/"
-  ensure_gitignore_line ".claude/commands/"
-  ensure_gitignore_line ".claude/skills/"
 fi
 echo "  updated $DST_GITIGNORE"
 
@@ -329,39 +298,37 @@ cat <<EOF
 ────────────────────────────────────────────────────
 Done.
 
+Toolkit version:    $SDD_VERSION
 Claude attribution: $CLAUDE_ATTRIBUTION
-Source: $SELECTED_SOURCE
+Track specs in git: $TRACK_SPECS
+Source:             $SELECTED_SOURCE
+
+Commands available in Claude Code:
+  /spec-draft  <SPEC-ID> <type> <title>
+  /spec-plan   <SPEC-ID> [changes]
+  /spec-build  <SPEC-ID>
+  /spec-status [SPEC-ID]
+
 EOF
 
-if [ "$SELECTED_SOURCE" = "jira" ]; then
+if [ "$SELECTED_SOURCE" = "local" ]; then
   cat <<EOF
-    project_key: $JIRA_PROJECT_KEY
-    workspace:   $JIRA_WORKSPACE
+To sync a spec to Jira or YouTrack:
+  1) edit .sdd/config.json — set "source" and fill the matching sources.* block
+  2) Jira: run 'acli auth login' once. YouTrack: export your token via the
+     env var named in sources.youtrack.token_env (defaults to YOUTRACK_TOKEN).
+  3) run 'sdd publish <SPEC-ID>'
 
-  Make sure you have run:   acli auth login
 EOF
-fi
-
-if [ "$SELECTED_SOURCE" = "youtrack" ]; then
+else
   cat <<EOF
-    base_url:  $YOUTRACK_BASE_URL
-    token_env: $YOUTRACK_TOKEN_ENV
+Source preserved from existing .sdd/config.json. Run 'sdd publish <SPEC-ID>'
+to sync a spec to $SELECTED_SOURCE.
 
-  Make sure \$$YOUTRACK_TOKEN_ENV is set to a valid YouTrack permanent token.
 EOF
 fi
 
 cat <<EOF
-
-Commands available in Claude Code:
-  /spec-draft <SPEC-ID> <type> <title>
-  /spec-plan  <SPEC-ID> [changes]
-  /spec-build <SPEC-ID>
-  /spec-status [SPEC-ID]
-
-Next: open this project in Claude Code and run
-      /spec-draft <SPEC-ID> <type> <short title>
-
 Re-run 'sdd init' any time after 'sdd upgrade' to pick up changes.
 ────────────────────────────────────────────────────
 EOF

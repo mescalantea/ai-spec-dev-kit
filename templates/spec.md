@@ -2,9 +2,7 @@
 spec_id: <SPEC-ID>
 spec_type: <feature|bugfix|refactor|chore|docs|experiment|hotfix|release|support>
 spec_title: <Title Case Description>
-branch: <spec_type>/<SPEC-ID>-<Title-Case-Words-Joined-By-Dashes>
-source: <local|jira|youtrack>
-source_ref: <null or external reference, e.g. JIRA key or YouTrack issue ID>
+branch: <spec_type>/<SPEC-ID>-<Title-Case-Words-Joined-By-Dashes>  # or <none> if no branch was created
 ---
 
 # Spec: <spec_title>

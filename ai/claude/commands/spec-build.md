@@ -8,15 +8,15 @@ Build a previously planned spec. Work one step at a time, pause after each for u
 
 User input: $ARGUMENTS
 
-- Adapter catalog: `.sdd/sources.md`.
-- Source I/O: delegate `push`, `detect_conflict`, and cache management to the `spec-source` skill.
-- Response style: `spec-caveman` skill applies (mode auto-selected per output type).
+Output style: terse. No filler, no narration. Code, git commit messages, PR bodies, and verbatim interactive prompts pass through unchanged.
 
 ## Workflow
 
 ### 1. Load and validate
 
-Read `.sdd/specs/<spec_id>.md`. Parse frontmatter (`source`, `source_ref`). Body must contain an `## Implementation Plan` section with checkboxes. Missing → tell user to run `/spec-plan <spec_id>` first and stop.
+Read `.sdd/specs/<spec_id>.md`. Parse frontmatter (`branch`). Body must contain an `## Implementation Plan` section with checkboxes. Missing → tell user to run `/spec-plan <spec_id>` first and stop.
+
+If `branch` is `<none>`, the spec is being built on the current branch — do not refuse to build, do not switch branches.
 
 Read `.sdd/config.json`. Extract `claude_attribution` (top-level boolean field). If the field is absent, non-boolean, or `config.json` is missing, default to `true`. Store as `CLAUDE_ATTRIBUTION` for use in §6 and §8.
 
@@ -24,7 +24,7 @@ Extract `track_specs` (top-level boolean field). If absent, non-boolean, or `con
 
 ### 2. Find next step
 
-First unchecked step (`- [ ]`). Superseded steps (`- [x] ~~...~~ _(superseded: ...)_`) count as done — skip. All checked or superseded → go to **Completion**.
+First unchecked step (`- [ ]`). Numbering may have gaps where prior re-plans deleted invalidated steps — that is expected. All steps checked → go to **Completion**.
 
 ### 3. Build the step
 
@@ -82,7 +82,7 @@ Back to step 2. Repeat until done.
 
 ### 7a. CLAUDE.md update
 
-Runs once, after all steps are checked/superseded, **only if at least one step was committed in this run.**
+Runs once, after all steps are checked, **only if at least one step was committed in this run.**
 
 1. Assess whether the completed build introduced behaviors, invariants, commands, or architectural facts that belong in the target's `CLAUDE.md`.
 2. If `CLAUDE.md` is absent in the project root → skip entirely.
@@ -94,14 +94,9 @@ Runs once, after all steps are checked/superseded, **only if at least one step w
 
 ### 8. Completion
 
-All checked or superseded:
+All steps checked:
 
-1. Sync to source. `source == "local"` → skip. Otherwise invoke `spec-source`:
-   - `push(source, source_ref, body_of(.sdd/specs/<spec_id>.md))`.
-   - Skill handles drift detection, user confirmation, frontmatter stripping, cache update.
-   - Capture result: `pushed | aborted by user | skipped (conflict unresolved)`.
-
-2. **Push / PR prompt.** Print:
+1. **Push / PR prompt.** Print:
 
    ```
    ──────────────────────────────────────
@@ -115,10 +110,10 @@ All checked or superseded:
 
    **STOP. Wait for user.**
 
-   - `skip` → print `Branch <branch> is ready locally. No remote changes made.` and proceed to step 3.
-   - `push` → run `git push -u origin <branch>`. On success print the remote URL. On failure print the error verbatim and proceed to step 3.
+   - `skip` → print `Branch <branch> is ready locally. No remote changes made.` and proceed to step 2.
+   - `push` → run `git push -u origin <branch>`. On success print the remote URL. On failure print the error verbatim and proceed to step 2.
    - `push + PR`:
-     1. Run `git push -u origin <branch>`. On push failure print the error verbatim and proceed to step 3 (do not attempt PR).
+     1. Run `git push -u origin <branch>`. On push failure print the error verbatim and proceed to step 2 (do not attempt PR).
      2. Check whether an open PR already tracks this branch: `gh pr list --head <branch> --state open --json number,url`.
         - Open PR found → run `gh pr edit <number> --body "<pr-body>"`.
         - No open PR → run `gh pr create --title "<spec_title>" --body "<pr-body>"`.
@@ -144,7 +139,7 @@ All checked or superseded:
              - Section asks for a **description, summary, overview, goal, purpose, or context** → replace its body with `SUMMARY`.
              - Section asks for **implementation, approach, or how something is done** → replace its body with `IMPLEMENTATION`.
              - Section asks for **changes, changelog, or what changed** → replace its body with `COMMITS`.
-             - Section asks for **references, links, or related issues** → fill sub-items that can be derived from spec data (e.g., `source_ref` → issue link) and remove sub-items that cannot be filled. If no sub-items can be filled, remove the entire section.
+             - Section asks for **references, links, or related issues** → fill sub-items that can be derived from spec data and remove sub-items that cannot be filled. If no sub-items can be filled, remove the entire section.
              - Section cannot be filled **but its placeholder text suggests a default value** (e.g., "just write 'Standard deployment'") → keep the section and replace its body with that default.
              - Section cannot be filled and has no suggested default (e.g., "Screenshots", "Testing checklist") → remove the section entirely (heading + body).
            - If no template section naturally received `COMMITS`, append a `## Commits` section containing the commit list at the end of the body (before attribution).
@@ -165,15 +160,16 @@ All checked or superseded:
      4. On `gh` success print the PR URL.
      5. On `gh` failure (not installed, not authenticated, etc.): keep the push, print the error verbatim, and print the equivalent manual command the user can run.
 
-3. Print:
+2. Print:
    ```
    ──────────────────────────────────────
    Build complete: <spec_id>
    Branch:  <current branch>
    Commits: <number of steps completed>
-   Source:  <skipped|pushed to <source>:<source_ref>|aborted by user>
    Remote:  <skipped|pushed|pushed + PR <url>|push failed>
    ──────────────────────────────────────
    ```
 
-4. Remind user to run the QA pipeline from CLAUDE.md if the last step didn't already cover it.
+3. Remind user to run the QA pipeline from CLAUDE.md if the last step didn't already cover it.
+
+4. If the spec is configured for a non-local source (`source` field in `.sdd/config.json`), suggest: `Run 'sdd publish <spec_id>' to sync the spec to <source>.` Do not call the publish script automatically — it is a separate user action.

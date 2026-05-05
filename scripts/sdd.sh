@@ -8,6 +8,7 @@
 #   init      Initialize or re-initialize the SDD toolkit in the current project
 #   upgrade   Update the toolkit to the latest version
 #   version   Show installed and latest available versions
+#   publish   Push a local spec to its configured external source
 #   uninstall Remove the sdd CLI and shell hook
 #   help      Show this help message
 #
@@ -95,14 +96,16 @@ Usage:
   sdd <command> [options]
 
 Commands:
-  init        Initialize or re-initialize the SDD toolkit in the current project
-  upgrade     Update the toolkit to the latest version
-  version     Show installed and latest available versions
-  uninstall   Remove the sdd CLI and shell hook
-  help        Show this help message
+  init             Initialize or re-initialize the SDD toolkit in the current project
+  upgrade          Update the toolkit to the latest version
+  version          Show installed and latest available versions
+  publish <id>     Push a local spec to its configured external source
+  uninstall        Remove the sdd CLI and shell hook
+  help             Show this help message
 
 Run 'sdd init' from your project root to set up the spec commands and configuration.
 Run 'sdd upgrade' to pull the latest toolkit changes from the remote repository.
+Run 'sdd publish <spec_id>' from a project to sync that spec to Jira/YouTrack.
 EOF
 }
 
@@ -164,6 +167,10 @@ cmd_uninstall() {
   exec "$SCRIPT_DIR/uninstall.sh"
 }
 
+cmd_publish() {
+  exec "$SCRIPT_DIR/sdd-publish.sh" "$@"
+}
+
 # ---------------------------------------------------------------------------
 # Dispatch.
 # ---------------------------------------------------------------------------
@@ -183,6 +190,10 @@ case "$COMMAND" in
     ;;
   uninstall)
     cmd_uninstall
+    ;;
+  publish)
+    shift
+    cmd_publish "$@"
     ;;
   help|--help|-h)
     cmd_help

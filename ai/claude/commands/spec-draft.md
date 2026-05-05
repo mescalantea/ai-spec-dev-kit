@@ -8,10 +8,7 @@ Draft a new spec or refresh an existing one. Adhere to CLAUDE.md.
 
 User input: $ARGUMENTS
 
-- Enabled sources: `.sdd/config.json`.
-- Adapter catalog: `.sdd/sources.md`.
-- Source I/O: delegate `pull`, `adapt`, and cache management to the `spec-source` skill.
-- Response style: `spec-caveman` skill applies (mode auto-selected per output type).
+Output style: terse. No filler, no narration. Code, git commit messages, PR bodies, and verbatim interactive prompts pass through unchanged.
 
 ## Workflow
 
@@ -33,8 +30,8 @@ If any field cannot be inferred, ask the user — do not guess.
 
 Check whether `.sdd/specs/<spec_id>.md` exists.
 
-- **Exists** → refresh mode. Skip branch creation. Refresh body and commit as a standalone commit.
-- **Missing** → new draft mode. Do dirty tree check and create branch.
+- **Exists** → refresh mode. Skip branch prompt. Refresh body and commit as a standalone commit.
+- **Missing** → new draft mode. Do dirty tree check and proceed to branch prompt.
 
 Read `.sdd/config.json`. Extract `track_specs` (top-level boolean field). If absent, non-boolean, or `config.json` is missing, default to `true`. Store as `TRACK_SPECS`.
 
@@ -46,26 +43,22 @@ Run `git status --porcelain`.
 - Refresh: anything other than `.sdd/specs/<spec_id>.md` → abort.
 - When `TRACK_SPECS` is `false`: `.sdd/` files are gitignored and will not appear in `git status` output. Only non-ignored dirty files matter for the check.
 
-### 4. Choose source
+### 4. Branch prompt (new draft only)
 
-Read `.sdd/config.json`, extract the top-level `source` field (one of `local`, `jira`, `youtrack`). If absent or not a recognised value, default to `local`.
+Skip in refresh mode.
 
-- `source == "local"` → skip to step 6.
-- Otherwise → use the selected source. Ask for `source_ref` if different from `spec_id`. Default: `source_ref = spec_id`.
+Print exactly:
 
-### 5. Pull and adapt (skill)
+```
+Branch <branch_name> will be created from HEAD. Create it now? [Y/n]
+```
 
-Invoke `spec-source`:
+Read response from user. Apply:
 
-1. `pull(source, source_ref)` → raw body.
-2. `adapt(source, body)` → proposed body (user must `continue` to accept).
-3. Skill writes `.sdd/specs/.cache/<source_ref>.<source>.md` on success.
+- `Y`, `y`, `yes`, or empty (default) → switch to new branch from HEAD using `branch_name`. If taken, append `-v2`, `-v3`, etc. Set frontmatter `branch: <branch_name>`.
+- `n`, `N`, `no` → skip branch creation. Set frontmatter `branch: <none>`. Stay on the current branch.
 
-### 6. Create branch (new draft only)
-
-Skip in refresh mode. Switch to a new branch from HEAD using `branch_name`. If taken, append `-v2`, `-v3`, etc.
-
-### 7. Write spec file
+### 5. Write spec file
 
 Read `.sdd/specs/template/spec.md`. Create `.sdd/specs/<spec_id>.md` with:
 
@@ -75,41 +68,37 @@ Read `.sdd/specs/template/spec.md`. Create `.sdd/specs/<spec_id>.md` with:
   spec_id: <spec_id>
   spec_type: <spec_type>
   spec_title: <spec_title>
-  branch: <branch_name>
-  source: <source>
-  source_ref: <source_ref or null>
+  branch: <branch_name or <none>>
   ---
   ```
-- Body = template sections populated from the adapted body (empty placeholders for `local`).
-- Fill what the source provides. Leave the rest for the user before `/spec-plan`.
+- Body = template sections with empty placeholders. The user fills the spec; nothing is auto-populated from external sources.
 
-Refresh mode: preserve any local-only sections added by the user (`## Clarifications`, `## Analysis`, `## Implementation Plan`) by appending them after the refreshed body. Do not silently drop planning work. If the body meaningfully changed, warn the user that the prior plan may be stale and recommend `/spec-plan <spec_id> <changes>`.
+Refresh mode: preserve any local-only sections added by the user (`## Clarifications`, `## Analysis`, `## Implementation Plan`) by appending them after the refreshed body. Do not silently drop planning work.
 
 No implementation details, code examples, or file paths — product-level document.
 
-### 8. Commit (refresh only)
+### 6. Commit (refresh only)
 
 Refresh mode, after writing:
 
 If `TRACK_SPECS` is `true`:
 ```
-git add .sdd/specs/<spec_id>.md .sdd/specs/.cache/<spec_id>.<source>.md 2>/dev/null
-git commit -m "<spec_id>: refresh spec from <source>"
+git add .sdd/specs/<spec_id>.md
+git commit -m "<spec_id>: refresh spec"
 ```
 
 If `TRACK_SPECS` is `false`: skip — the spec update lives on disk only.
 
 New draft: leave uncommitted — user commits after review.
 
-### 9. Output
+### 7. Output
 
 Print exactly:
 
 ```
 Spec:    .sdd/specs/<spec_id>.md
-Branch:  <branch_name>
+Branch:  <branch_name or <none>>
 Title:   <spec_title>
-Source:  <source>[:<source_ref>]
 Mode:    <new|refreshed>
 
 Next: /spec-plan <spec_id>
