@@ -90,9 +90,11 @@ If `TRACK_SPECS` is `true`:
 ```
 git add .sdd/specs/<spec_id>.md
 git commit -m "<type>: refresh spec"
+# subject above; Claude Code appends its Co-Authored-By trailer as the body
+# unless claude_attribution is false (then commit the subject alone)
 ```
 
-`<type>` is a Conventional-Commits prefix. Default to `docs` (a spec refresh is documentation work); pick a different prefix when the refresh content clearly belongs elsewhere. The subject must not contain the spec_id, the step number, internal ticket numbers, customer information, credentials, or any other sensitive identifier. Attribution follows the same rules as `/spec-build` §6.2 — when `claude_attribution` is `true`, defer to Claude Code's built-in `Co-Authored-By` trailer; when `false`, explicitly suppress it.
+`<type>` is a Conventional-Commits prefix. Default to `docs` (a spec refresh is documentation work); pick a different prefix when the refresh content clearly belongs elsewhere. The subject must not contain the spec_id, the step number, internal ticket numbers, customer information, credentials, or any other sensitive identifier. Attribution follows the same rules as `/spec-build` §6.2 — the message may carry an extended body where Claude Code's `Co-Authored-By` trailer lives, so do not constrain it to a bare single-line subject; only when `claude_attribution` is `false` is the trailer explicitly suppressed.
 
 If `TRACK_SPECS` is `false`: skip — the spec update lives on disk only.
 

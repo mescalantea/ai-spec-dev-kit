@@ -77,11 +77,10 @@ The §4 `AskUserQuestion` invocation is the canonical pause point. Its arguments
 ### 6. Commit and mark done
 
 1. `git add -A`
-2. Commit subject: `<type>: <short description of the change>`
+2. Commit message. The subject is `<type>: <short description of the change>`; the message may also carry an extended body (the paragraphs after the subject's blank line), which is where commit attribution lives. Do not commit with a bare single-line subject — leave room for the extended body so Claude Code's `Co-Authored-By` trailer has somewhere to go.
    - `<type>` is a Conventional-Commits prefix (no scope). Derive it from the spec's frontmatter `spec_type` via this mapping: `feature`→`feat`, `bugfix`→`fix`, `refactor`→`refactor`, `chore`→`chore`, `docs`→`docs`, `experiment`→`experiment`, `hotfix`→`fix`, `release`→`chore`, `support`→`chore`. When the step's actual change clearly belongs to a different category (e.g., a `feature`-typed spec whose step is a pure typo fix), pick the type that matches the change instead.
    - The subject must NOT contain the spec_id, the step number, internal ticket numbers, customer information, credentials, API keys, internal URLs, or external system names. See `## Coding Standards` below.
-   - If `CLAUDE_ATTRIBUTION` is `true`: defer to Claude Code's built-in attribution. Do not write an explicit `Co-Authored-By` trailer in the commit message — the harness adds one automatically with the current model.
-   - If `CLAUDE_ATTRIBUTION` is `false`: explicitly suppress attribution. The commit message body must not contain any `Co-Authored-By` trailer, model identifier, or `🤖 Generated with Claude Code` line. Pass the full commit message explicitly so the harness cannot append its default trailer.
+   - If `CLAUDE_ATTRIBUTION` is `false`: explicitly suppress attribution. The commit message must not contain any `Co-Authored-By` trailer, model identifier, or `🤖 Generated with Claude Code` line — override Claude Code's default so no trailer is appended.
 3. Update spec: change `- [ ] Step N:` to `- [x] Step N:` for the completed step.
 4. If `TRACK_SPECS` is `true`: `git add .sdd/specs/<spec_id>.md && git commit --amend --no-edit`
    If `TRACK_SPECS` is `false`: skip — the checkbox update lives on disk only.
