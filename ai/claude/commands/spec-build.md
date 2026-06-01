@@ -31,10 +31,11 @@ First unchecked step (`- [ ]`). Numbering may have gaps where prior re-plans del
 Read the step carefully. It names specific files and actions. Follow:
 - Coding conventions from CLAUDE.md.
 - Closest analogous patterns in the codebase.
+- The `## Coding Standards` section at the end of this file (comment style + sensitive-info policy) — re-read it before writing code and before drafting the commit message in §6.
 
 ### 4. Pause for review
 
-After implementing, print:
+After implementing, print this context block (so the user can see what changed before answering):
 
 ```
 ──────────────────────────────────────
@@ -45,32 +46,42 @@ Files changed:
   - <list of files modified or created>
 
 Summary: <brief description of what was done>
-
-Type "continue" to commit and proceed to the next step.
-Type "abort" to stop without committing.
-Type any feedback to request changes before committing.
 ──────────────────────────────────────
 ```
 
-**STOP. Do not commit. Do not proceed. Wait for user.**
+Then call the `AskUserQuestion` tool with these arguments **verbatim** (only `N` and `<short step description>` substitute):
+
+- `question`: `Commit step N — "<short step description>"?`
+- `header`: `Step N`
+- `multiSelect`: `false`
+- `options`:
+  - `label`: `Continue` — `description`: `Commit this step and proceed to the next.`
+  - `label`: `Abort` — `description`: `Stop the build without committing this step.`
+
+`AskUserQuestion` automatically surfaces an `Other` affordance that lets the user type free-form feedback; do not list `Other` explicitly in the options array.
+
+**STOP after the tool call. Do not commit. Do not proceed. Wait for the user's selection.**
 
 ### 5. Handle response
 
-- `continue` → go to step 6.
-- `abort` → stop immediately, do not commit, print how many steps remain.
-- Anything else → treat as feedback:
+- Selected `Continue` → go to §6.
+- Selected `Abort` → stop immediately, do not commit, print how many steps remain.
+- Selected `Other` (free-form feedback in the tool's notes/text field):
   1. Apply the requested changes.
-  2. Re-display the §4 pause prompt **byte-identical** to the first display (same wording, same border lines, updated "Files changed" and "Summary" if the changes affected them).
-  3. Wait for user response. Loop indefinitely until `continue` or `abort`.
+  2. Re-print the §4 context block (border lines + Step header + Files changed + Summary, refreshed if the feedback affected them).
+  3. Call `AskUserQuestion` again with **identical** `question`, `header`, and `options` arrays as in §4 (byte-identical tool-call arguments). Only the context block above the tool call may change.
+  4. Loop indefinitely until the user selects `Continue` or `Abort`.
 
-  The prompt re-display is mandatory after every feedback round, regardless of how many iterations the loop has run.
+The §4 `AskUserQuestion` invocation is the canonical pause point. Its arguments must be byte-identical across re-displays — same `question` text, same `header`, same option `label`/`description` strings, in the same order.
 
 ### 6. Commit and mark done
 
 1. `git add -A`
-2. Commit: `<spec_id>: step N - <short step description>`
-   - If `CLAUDE_ATTRIBUTION` is `true`: include a `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` trailer in the commit message body.
-   - If `CLAUDE_ATTRIBUTION` is `false`: do **not** append any `Co-Authored-By` trailer. Pass the full commit message explicitly and do not add attribution.
+2. Commit subject: `<type>: <short description of the change>`
+   - `<type>` is a Conventional-Commits prefix (no scope). Derive it from the spec's frontmatter `spec_type` via this mapping: `feature`→`feat`, `bugfix`→`fix`, `refactor`→`refactor`, `chore`→`chore`, `docs`→`docs`, `experiment`→`experiment`, `hotfix`→`fix`, `release`→`chore`, `support`→`chore`. When the step's actual change clearly belongs to a different category (e.g., a `feature`-typed spec whose step is a pure typo fix), pick the type that matches the change instead.
+   - The subject must NOT contain the spec_id, the step number, internal ticket numbers, customer information, credentials, API keys, internal URLs, or external system names. See `## Coding Standards` below.
+   - If `CLAUDE_ATTRIBUTION` is `true`: defer to Claude Code's built-in attribution. Do not write an explicit `Co-Authored-By` trailer in the commit message — the harness adds one automatically with the current model.
+   - If `CLAUDE_ATTRIBUTION` is `false`: explicitly suppress attribution. The commit message body must not contain any `Co-Authored-By` trailer, model identifier, or `🤖 Generated with Claude Code` line. Pass the full commit message explicitly so the harness cannot append its default trailer.
 3. Update spec: change `- [ ] Step N:` to `- [x] Step N:` for the completed step.
 4. If `TRACK_SPECS` is `true`: `git add .sdd/specs/<spec_id>.md && git commit --amend --no-edit`
    If `TRACK_SPECS` is `false`: skip — the checkbox update lives on disk only.
@@ -89,30 +100,36 @@ Runs once, after all steps are checked, **only if at least one step was committe
 3. If no CLAUDE.md-worthy changes were introduced → skip entirely (do not create a no-op commit).
 4. Otherwise:
    - Edit `CLAUDE.md` to reflect the new facts (new commands, changed invariants, updated tail behaviors, etc.).
-   - Commit: `<spec_id>: update CLAUDE.md with new behaviors`
+   - Commit subject: `docs: <short description of what was documented>` — same Conventional-Commits format and same attribution rules as §6.2. No spec_id, no step number.
 5. Then proceed to §8.
 
 ### 8. Completion
 
 All steps checked:
 
-1. **Push / PR prompt.** Print:
+1. **Push / PR prompt.** Print this context block:
 
    ```
    ──────────────────────────────────────
    Ready to push branch: <branch>
-
-   Type "push" to push the branch to origin.
-   Type "push + PR" to push and create or update a pull request.
-   Type "skip" to exit without touching the remote.
    ──────────────────────────────────────
    ```
 
-   **STOP. Wait for user.**
+   Then call the `AskUserQuestion` tool with these arguments **verbatim**:
 
-   - `skip` → print `Branch <branch> is ready locally. No remote changes made.` and proceed to step 2.
-   - `push` → run `git push -u origin <branch>`. On success print the remote URL. On failure print the error verbatim and proceed to step 2.
-   - `push + PR`:
+   - `question`: `Push branch <branch> to origin?`
+   - `header`: `Push`
+   - `multiSelect`: `false`
+   - `options`:
+     - `label`: `Push` — `description`: `Push the branch to origin without creating a PR.`
+     - `label`: `Push + PR` — `description`: `Push the branch and create or update a pull request.`
+     - `label`: `Skip` — `description`: `Exit without touching the remote.`
+
+   **STOP after the tool call. Wait for the user's selection.**
+
+   - Selected `Skip` → print `Branch <branch> is ready locally. No remote changes made.` and proceed to step 2.
+   - Selected `Push` → run `git push -u origin <branch>`. On success print the remote URL. On failure print the error verbatim and proceed to step 2.
+   - Selected `Push + PR`:
      1. Run `git push -u origin <branch>`. On push failure print the error verbatim and proceed to step 2 (do not attempt PR).
      2. Check whether an open PR already tracks this branch: `gh pr list --head <branch> --state open --json number,url`.
         - Open PR found → run `gh pr edit <number> --body "<pr-body>"`.
@@ -127,35 +144,28 @@ All steps checked:
            5. `PULL_REQUEST_TEMPLATE.md` (repo root)
            6. `pull_request_template.md` (repo root)
 
-        **b. Template found → fill it.**
+        **b. Template found → it is authoritative.** Honor the repo's PR/MR template structure verbatim; do not introduce headings or sections that the template does not define.
            - Parse the template into sections (split on markdown headings `## …` / `### …`). Any content before the first heading is the *preamble*.
            - **Preamble handling**: If the preamble contains explicit removal instructions (e.g., "remove before submitting", ✂ markers, or similar prompts directed at the PR author), strip the entire preamble. Otherwise preserve it, including any HTML comments (`<!-- … -->`).
            - Prepare spec data:
              - `SUMMARY` = spec `## Summary` section body (verbatim).
              - `IMPLEMENTATION` = spec `## Analysis` section body + the step descriptions from `## Implementation Plan` (without checkboxes/status markup). If `## Analysis` is absent, use only the plan steps.
-             - `COMMITS` = output of `git log origin/main..<branch> --oneline`.
-             - `ATTRIBUTION` = `🤖 Generated with [Claude Code](https://claude.com/claude-code)` (omit entirely when `CLAUDE_ATTRIBUTION` is `false`).
+           - PR bodies must not contain any Claude attribution — no `Co-Authored-By` line, no `🤖 Generated with Claude Code` footer, no model identifier, no "Generated with" mention. This rule is unconditional and does not depend on `CLAUDE_ATTRIBUTION` (that flag governs commit messages only).
+           - PR bodies must not include a commit list, changelog, or `## Commits` section. The commit list is already visible in the PR's own "Commits" tab and would be a duplicate. Do not append such a section even when the template lacks one.
            - For each template section, decide by reading the section heading and any placeholder/prompt text:
              - Section asks for a **description, summary, overview, goal, purpose, or context** → replace its body with `SUMMARY`.
              - Section asks for **implementation, approach, or how something is done** → replace its body with `IMPLEMENTATION`.
-             - Section asks for **changes, changelog, or what changed** → replace its body with `COMMITS`.
+             - Section asks for **changes, changelog, or what changed** → replace its body with `IMPLEMENTATION` (the step descriptions describe what changed without duplicating the commit list).
              - Section asks for **references, links, or related issues** → fill sub-items that can be derived from spec data and remove sub-items that cannot be filled. If no sub-items can be filled, remove the entire section.
              - Section cannot be filled **but its placeholder text suggests a default value** (e.g., "just write 'Standard deployment'") → keep the section and replace its body with that default.
              - Section cannot be filled and has no suggested default (e.g., "Screenshots", "Testing checklist") → remove the section entirely (heading + body).
-           - If no template section naturally received `COMMITS`, append a `## Commits` section containing the commit list at the end of the body (before attribution).
-           - Append `ATTRIBUTION` (if non-empty) as the last line of the body.
 
         **c. No template found → use default format.**
            ```
            ## Summary
            <spec Summary section verbatim>
-
-           ## Commits
-           <output of: git log origin/main..<branch> --oneline>
-
-           🤖 Generated with [Claude Code](https://claude.com/claude-code)
            ```
-           If `CLAUDE_ATTRIBUTION` is `false`, omit the `🤖 Generated with [Claude Code](https://claude.com/claude-code)` line.
+           No commit list, no changelog, no attribution footer is appended.
 
      4. On `gh` success print the PR URL.
      5. On `gh` failure (not installed, not authenticated, etc.): keep the push, print the error verbatim, and print the equivalent manual command the user can run.
@@ -173,3 +183,33 @@ All steps checked:
 3. Remind user to run the QA pipeline from CLAUDE.md if the last step didn't already cover it.
 
 4. If the spec is configured for a non-local source (`source` field in `.sdd/config.json`), suggest: `Run 'sdd publish <spec_id>' to sync the spec to <source>.` Do not call the publish script automatically — it is a separate user action.
+
+## Coding Standards
+
+These standards apply to every piece of code Claude writes during a build, every commit message it drafts, and every PR body it generates. Re-read this section at the start of each step (§3) and before writing the commit message (§6.2).
+
+### Code comments
+
+- Default to writing no comments. Only add a comment when the *why* is non-obvious (a hidden constraint, a subtle invariant, a workaround for a specific bug, behavior that would surprise a reader). If removing the comment would not confuse a future reader, do not write it.
+- Keep comments terse — one line whenever possible, never multi-paragraph. Well-named identifiers already document *what* the code does; comments cover only *why*.
+- Comments must not reference the spec_id, the step number, the current task, the originating ticket, or any other transient artifact of the development flow. The code outlives the spec; those references rot. Use git history and the spec file for that context, not in-code comments.
+- Do not annotate removed code with "// removed", "// was X", or similar markers. Delete the code outright.
+
+### Sensitive information
+
+The following must not appear anywhere in source files, comments, commit subjects, commit bodies, PR titles, or PR bodies produced by `/spec-build`:
+
+- Internal ticket numbers, project keys, or any other identifier that exposes the issue-tracking system in use.
+- Customer names, customer identifiers, account numbers, email addresses, or other personally identifying information.
+- API keys, tokens, passwords, certificates, private URLs, signing secrets, or anything that grants access to a system.
+- Internal hostnames, internal service names, internal DNS, internal subdomains, or internal IP ranges.
+- External system or vendor names where the relationship is not public (e.g., undisclosed third-party providers).
+- Security-related details that would aid an attacker (specific CVE chains being mitigated, authentication algorithm choices, rate-limit thresholds, vulnerable code paths).
+
+When such information is genuinely needed to explain a change, generalise it: "the upstream ticket tracker" rather than the project key; "the customer-facing surface" rather than a customer name; "the credential store" rather than the env-var name of a specific secret.
+
+### Commit and PR phrasing
+
+- Subjects use the Conventional-Commits format from §6.2 — no spec_id, no step number, no internal references.
+- Bodies, when present, describe *what* the change does and *why*, in normal prose. They must not list the spec_id, step number, or any of the sensitive-information items above.
+- PR bodies follow §8.3 — no attribution, no commit list.
