@@ -31,6 +31,7 @@ First unchecked step (`- [ ]`). Numbering may have gaps where prior re-plans del
 Read the step carefully. It names specific files and actions. Follow:
 - Coding conventions from CLAUDE.md.
 - Closest analogous patterns in the codebase.
+- The `## Coding Standards` section at the end of this file (comment style + sensitive-info policy) — re-read it before writing code and before drafting the commit message in §6.
 
 ### 4. Pause for review
 
@@ -182,3 +183,33 @@ All steps checked:
 3. Remind user to run the QA pipeline from CLAUDE.md if the last step didn't already cover it.
 
 4. If the spec is configured for a non-local source (`source` field in `.sdd/config.json`), suggest: `Run 'sdd publish <spec_id>' to sync the spec to <source>.` Do not call the publish script automatically — it is a separate user action.
+
+## Coding Standards
+
+These standards apply to every piece of code Claude writes during a build, every commit message it drafts, and every PR body it generates. Re-read this section at the start of each step (§3) and before writing the commit message (§6.2).
+
+### Code comments
+
+- Default to writing no comments. Only add a comment when the *why* is non-obvious (a hidden constraint, a subtle invariant, a workaround for a specific bug, behavior that would surprise a reader). If removing the comment would not confuse a future reader, do not write it.
+- Keep comments terse — one line whenever possible, never multi-paragraph. Well-named identifiers already document *what* the code does; comments cover only *why*.
+- Comments must not reference the spec_id, the step number, the current task, the originating ticket, or any other transient artifact of the development flow. The code outlives the spec; those references rot. Use git history and the spec file for that context, not in-code comments.
+- Do not annotate removed code with "// removed", "// was X", or similar markers. Delete the code outright.
+
+### Sensitive information
+
+The following must not appear anywhere in source files, comments, commit subjects, commit bodies, PR titles, or PR bodies produced by `/spec-build`:
+
+- Internal ticket numbers, project keys, or any other identifier that exposes the issue-tracking system in use.
+- Customer names, customer identifiers, account numbers, email addresses, or other personally identifying information.
+- API keys, tokens, passwords, certificates, private URLs, signing secrets, or anything that grants access to a system.
+- Internal hostnames, internal service names, internal DNS, internal subdomains, or internal IP ranges.
+- External system or vendor names where the relationship is not public (e.g., undisclosed third-party providers).
+- Security-related details that would aid an attacker (specific CVE chains being mitigated, authentication algorithm choices, rate-limit thresholds, vulnerable code paths).
+
+When such information is genuinely needed to explain a change, generalise it: "the upstream ticket tracker" rather than the project key; "the customer-facing surface" rather than a customer name; "the credential store" rather than the env-var name of a specific secret.
+
+### Commit and PR phrasing
+
+- Subjects use the Conventional-Commits format from §6.2 — no spec_id, no step number, no internal references.
+- Bodies, when present, describe *what* the change does and *why*, in normal prose. They must not list the spec_id, step number, or any of the sensitive-information items above.
+- PR bodies follow §8.3 — no attribution, no commit list.
