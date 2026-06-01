@@ -34,7 +34,7 @@ Read the step carefully. It names specific files and actions. Follow:
 
 ### 4. Pause for review
 
-After implementing, print:
+After implementing, print this context block (so the user can see what changed before answering):
 
 ```
 ──────────────────────────────────────
@@ -45,25 +45,33 @@ Files changed:
   - <list of files modified or created>
 
 Summary: <brief description of what was done>
-
-Type "continue" to commit and proceed to the next step.
-Type "abort" to stop without committing.
-Type any feedback to request changes before committing.
 ──────────────────────────────────────
 ```
 
-**STOP. Do not commit. Do not proceed. Wait for user.**
+Then call the `AskUserQuestion` tool with these arguments **verbatim** (only `N` and `<short step description>` substitute):
+
+- `question`: `Commit step N — "<short step description>"?`
+- `header`: `Step N`
+- `multiSelect`: `false`
+- `options`:
+  - `label`: `Continue` — `description`: `Commit this step and proceed to the next.`
+  - `label`: `Abort` — `description`: `Stop the build without committing this step.`
+
+`AskUserQuestion` automatically surfaces an `Other` affordance that lets the user type free-form feedback; do not list `Other` explicitly in the options array.
+
+**STOP after the tool call. Do not commit. Do not proceed. Wait for the user's selection.**
 
 ### 5. Handle response
 
-- `continue` → go to step 6.
-- `abort` → stop immediately, do not commit, print how many steps remain.
-- Anything else → treat as feedback:
+- Selected `Continue` → go to §6.
+- Selected `Abort` → stop immediately, do not commit, print how many steps remain.
+- Selected `Other` (free-form feedback in the tool's notes/text field):
   1. Apply the requested changes.
-  2. Re-display the §4 pause prompt **byte-identical** to the first display (same wording, same border lines, updated "Files changed" and "Summary" if the changes affected them).
-  3. Wait for user response. Loop indefinitely until `continue` or `abort`.
+  2. Re-print the §4 context block (border lines + Step header + Files changed + Summary, refreshed if the feedback affected them).
+  3. Call `AskUserQuestion` again with **identical** `question`, `header`, and `options` arrays as in §4 (byte-identical tool-call arguments). Only the context block above the tool call may change.
+  4. Loop indefinitely until the user selects `Continue` or `Abort`.
 
-  The prompt re-display is mandatory after every feedback round, regardless of how many iterations the loop has run.
+The §4 `AskUserQuestion` invocation is the canonical pause point. Its arguments must be byte-identical across re-displays — same `question` text, same `header`, same option `label`/`description` strings, in the same order.
 
 ### 6. Commit and mark done
 
