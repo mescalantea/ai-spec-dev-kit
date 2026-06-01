@@ -47,16 +47,21 @@ Run `git status --porcelain`.
 
 Skip in refresh mode.
 
-Print exactly:
+Call the `AskUserQuestion` tool with these arguments **verbatim** (only `<branch_name>` substitutes):
 
-```
-Branch <branch_name> will be created from HEAD. Create it now? [Y/n]
-```
+- `question`: `Create branch <branch_name> from HEAD?`
+- `header`: `Branch`
+- `multiSelect`: `false`
+- `options`:
+  - `label`: `Yes (create branch)` — `description`: `Switch to a new branch named <branch_name> from the current HEAD.`
+  - `label`: `No (stay here)` — `description`: `Skip branch creation. Stay on the current branch.`
 
-Read response from user. Apply:
+`Yes (create branch)` is the recommended option (list it first).
 
-- `Y`, `y`, `yes`, or empty (default) → switch to new branch from HEAD using `branch_name`. If taken, append `-v2`, `-v3`, etc. Set frontmatter `branch: <branch_name>`.
-- `n`, `N`, `no` → skip branch creation. Set frontmatter `branch: <none>`. Stay on the current branch.
+**STOP after the tool call. Wait for the user's selection.**
+
+- Selected `Yes (create branch)` → switch to new branch from HEAD using `branch_name`. If taken, append `-v2`, `-v3`, etc. Set frontmatter `branch: <branch_name>`.
+- Selected `No (stay here)` → skip branch creation. Set frontmatter `branch: <none>`. Stay on the current branch.
 
 ### 5. Write spec file
 
@@ -84,8 +89,10 @@ Refresh mode, after writing:
 If `TRACK_SPECS` is `true`:
 ```
 git add .sdd/specs/<spec_id>.md
-git commit -m "<spec_id>: refresh spec"
+git commit -m "<type>: refresh spec"
 ```
+
+`<type>` is a Conventional-Commits prefix. Default to `docs` (a spec refresh is documentation work); pick a different prefix when the refresh content clearly belongs elsewhere. The subject must not contain the spec_id, the step number, internal ticket numbers, customer information, credentials, or any other sensitive identifier. Attribution follows the same rules as `/spec-build` §6.2 — when `claude_attribution` is `true`, defer to Claude Code's built-in `Co-Authored-By` trailer; when `false`, explicitly suppress it.
 
 If `TRACK_SPECS` is `false`: skip — the spec update lives on disk only.
 
