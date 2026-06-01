@@ -106,23 +106,29 @@ Runs once, after all steps are checked, **only if at least one step was committe
 
 All steps checked:
 
-1. **Push / PR prompt.** Print:
+1. **Push / PR prompt.** Print this context block:
 
    ```
    ──────────────────────────────────────
    Ready to push branch: <branch>
-
-   Type "push" to push the branch to origin.
-   Type "push + PR" to push and create or update a pull request.
-   Type "skip" to exit without touching the remote.
    ──────────────────────────────────────
    ```
 
-   **STOP. Wait for user.**
+   Then call the `AskUserQuestion` tool with these arguments **verbatim**:
 
-   - `skip` → print `Branch <branch> is ready locally. No remote changes made.` and proceed to step 2.
-   - `push` → run `git push -u origin <branch>`. On success print the remote URL. On failure print the error verbatim and proceed to step 2.
-   - `push + PR`:
+   - `question`: `Push branch <branch> to origin?`
+   - `header`: `Push`
+   - `multiSelect`: `false`
+   - `options`:
+     - `label`: `Push` — `description`: `Push the branch to origin without creating a PR.`
+     - `label`: `Push + PR` — `description`: `Push the branch and create or update a pull request.`
+     - `label`: `Skip` — `description`: `Exit without touching the remote.`
+
+   **STOP after the tool call. Wait for the user's selection.**
+
+   - Selected `Skip` → print `Branch <branch> is ready locally. No remote changes made.` and proceed to step 2.
+   - Selected `Push` → run `git push -u origin <branch>`. On success print the remote URL. On failure print the error verbatim and proceed to step 2.
+   - Selected `Push + PR`:
      1. Run `git push -u origin <branch>`. On push failure print the error verbatim and proceed to step 2 (do not attempt PR).
      2. Check whether an open PR already tracks this branch: `gh pr list --head <branch> --state open --json number,url`.
         - Open PR found → run `gh pr edit <number> --body "<pr-body>"`.
