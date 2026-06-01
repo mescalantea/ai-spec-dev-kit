@@ -75,7 +75,7 @@ The §4 `AskUserQuestion` invocation is the canonical pause point. Its arguments
 ### 6. Commit and mark done
 
 1. `git add -A`
-2. Commit message. The subject is `<type>: <short description of the change>`; the message may also carry an extended body (the paragraphs after the subject's blank line). Do not commit with a bare single-line subject — leave room for the extended body so Claude Code's `Co-Authored-By` trailer (governed by Claude Code's own configuration) has somewhere to go.
+2. Commit message. The subject is `<type>: <short description of the change>`; the message may also carry an extended body (the paragraphs after the subject's blank line). Do not commit with a bare single-line subject — leave room for an extended body. SDD does not manage commit attribution: it neither forces nor suppresses the `Co-Authored-By` trailer. Do not assume it is appended automatically — if a trailer is expected, whoever writes the commit must include it at the end of the message.
    - `<type>` is a Conventional-Commits prefix (no scope). Derive it from the spec's frontmatter `spec_type` via this mapping: `feature`→`feat`, `bugfix`→`fix`, `refactor`→`refactor`, `chore`→`chore`, `docs`→`docs`, `experiment`→`experiment`, `hotfix`→`fix`, `release`→`chore`, `support`→`chore`. When the step's actual change clearly belongs to a different category (e.g., a `feature`-typed spec whose step is a pure typo fix), pick the type that matches the change instead.
    - The subject must NOT contain the spec_id, the step number, internal ticket numbers, customer information, credentials, API keys, internal URLs, or external system names. See `## Coding Standards` below.
 3. Update spec: change `- [ ] Step N:` to `- [x] Step N:` for the completed step.
