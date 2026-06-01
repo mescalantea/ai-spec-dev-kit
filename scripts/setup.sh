@@ -169,9 +169,6 @@ fi
 # Wizard questions.
 # ---------------------------------------------------------------------------
 
-CLAUDE_ATTRIBUTION=$(prompt_yn "Include Claude as a co-author in commits and PR bodies?" "y")
-
-echo
 echo "Version control"
 echo "---------------"
 echo "Spec files under .sdd/specs/ can be committed alongside your code or kept local-only."
@@ -209,18 +206,18 @@ fi
 cp "$SRC_TEMPLATE" "$DST_TEMPLATE_DIR/spec.md"
 echo "  wrote $DST_TEMPLATE_DIR/spec.md"
 
-# Config. We always rewrite `sdd_version`, `claude_attribution`, and
-# `track_specs` from the wizard's answers. We PRESERVE `source` and the
-# `sources.*` blocks from any existing config — re-running `sdd init`
-# should not wipe a user's Jira/YouTrack configuration.
-python3 - "$DST_CONFIG" "$SDD_VERSION" "$CLAUDE_ATTRIBUTION" "$TRACK_SPECS" <<'PY' > "$DST_CONFIG.tmp"
+# Config. We always rewrite `sdd_version` and `track_specs` from the wizard's
+# answers. We PRESERVE `source` and the `sources.*` blocks from any existing
+# config — re-running `sdd init` should not wipe a user's Jira/YouTrack
+# configuration. Commit attribution is governed by Claude Code's own config,
+# not by SDD.
+python3 - "$DST_CONFIG" "$SDD_VERSION" "$TRACK_SPECS" <<'PY' > "$DST_CONFIG.tmp"
 import json, os, sys
 
-path, ver, attr, track = sys.argv[1:5]
+path, ver, track = sys.argv[1:4]
 
 defaults = {
     "sdd_version": ver,
-    "claude_attribution": attr == "true",
     "track_specs": track == "true",
     "source": "local",
     "sources": {
@@ -242,8 +239,10 @@ if os.path.isfile(path):
 
 # Always-rewrite fields (the wizard owns these).
 cfg["sdd_version"] = defaults["sdd_version"]
-cfg["claude_attribution"] = defaults["claude_attribution"]
 cfg["track_specs"] = defaults["track_specs"]
+
+# Drop the retired `claude_attribution` field from older configs.
+cfg.pop("claude_attribution", None)
 
 # Preserve `source` if previously set to a recognised value; otherwise default.
 if cfg.get("source") not in ("local", "jira", "youtrack"):
@@ -299,7 +298,6 @@ cat <<EOF
 Done.
 
 Toolkit version:    $SDD_VERSION
-Claude attribution: $CLAUDE_ATTRIBUTION
 Track specs in git: $TRACK_SPECS
 Source:             $SELECTED_SOURCE
 

@@ -18,9 +18,7 @@ Read `.sdd/specs/<spec_id>.md`. Parse frontmatter (`branch`). Body must contain 
 
 If `branch` is `<none>`, the spec is being built on the current branch — do not refuse to build, do not switch branches.
 
-Read `.sdd/config.json`. Extract `claude_attribution` (top-level boolean field). If the field is absent, non-boolean, or `config.json` is missing, default to `true`. Store as `CLAUDE_ATTRIBUTION` for use in §6 and §8.
-
-Extract `track_specs` (top-level boolean field). If absent, non-boolean, or `config.json` is missing, default to `true`. Store as `TRACK_SPECS` for use in §6.
+Read `.sdd/config.json`. Extract `track_specs` (top-level boolean field). If absent, non-boolean, or `config.json` is missing, default to `true`. Store as `TRACK_SPECS` for use in §6.
 
 ### 2. Find next step
 
@@ -77,10 +75,9 @@ The §4 `AskUserQuestion` invocation is the canonical pause point. Its arguments
 ### 6. Commit and mark done
 
 1. `git add -A`
-2. Commit message. The subject is `<type>: <short description of the change>`; the message may also carry an extended body (the paragraphs after the subject's blank line), which is where commit attribution lives. Do not commit with a bare single-line subject — leave room for the extended body so Claude Code's `Co-Authored-By` trailer has somewhere to go.
+2. Commit message. The subject is `<type>: <short description of the change>`; the message may also carry an extended body (the paragraphs after the subject's blank line). Do not commit with a bare single-line subject — leave room for the extended body so Claude Code's `Co-Authored-By` trailer (governed by Claude Code's own configuration) has somewhere to go.
    - `<type>` is a Conventional-Commits prefix (no scope). Derive it from the spec's frontmatter `spec_type` via this mapping: `feature`→`feat`, `bugfix`→`fix`, `refactor`→`refactor`, `chore`→`chore`, `docs`→`docs`, `experiment`→`experiment`, `hotfix`→`fix`, `release`→`chore`, `support`→`chore`. When the step's actual change clearly belongs to a different category (e.g., a `feature`-typed spec whose step is a pure typo fix), pick the type that matches the change instead.
    - The subject must NOT contain the spec_id, the step number, internal ticket numbers, customer information, credentials, API keys, internal URLs, or external system names. See `## Coding Standards` below.
-   - If `CLAUDE_ATTRIBUTION` is `false`: explicitly suppress attribution. The commit message must not contain any `Co-Authored-By` trailer, model identifier, or `🤖 Generated with Claude Code` line — override Claude Code's default so no trailer is appended.
 3. Update spec: change `- [ ] Step N:` to `- [x] Step N:` for the completed step.
 4. If `TRACK_SPECS` is `true`: `git add .sdd/specs/<spec_id>.md && git commit --amend --no-edit`
    If `TRACK_SPECS` is `false`: skip — the checkbox update lives on disk only.
@@ -99,7 +96,7 @@ Runs once, after all steps are checked, **only if at least one step was committe
 3. If no CLAUDE.md-worthy changes were introduced → skip entirely (do not create a no-op commit).
 4. Otherwise:
    - Edit `CLAUDE.md` to reflect the new facts (new commands, changed invariants, updated tail behaviors, etc.).
-   - Commit subject: `docs: <short description of what was documented>` — same Conventional-Commits format and same attribution rules as §6.2. No spec_id, no step number.
+   - Commit subject: `docs: <short description of what was documented>` — same Conventional-Commits format and message rules as §6.2. No spec_id, no step number.
 5. Then proceed to §8.
 
 ### 8. Completion
@@ -149,7 +146,6 @@ All steps checked:
            - Prepare spec data:
              - `SUMMARY` = spec `## Summary` section body (verbatim).
              - `IMPLEMENTATION` = spec `## Analysis` section body + the step descriptions from `## Implementation Plan` (without checkboxes/status markup). If `## Analysis` is absent, use only the plan steps.
-           - PR bodies must not contain any Claude attribution — no `Co-Authored-By` line, no `🤖 Generated with Claude Code` footer, no model identifier, no "Generated with" mention. This rule is unconditional and does not depend on `CLAUDE_ATTRIBUTION` (that flag governs commit messages only).
            - PR bodies must not include a commit list, changelog, or `## Commits` section. The commit list is already visible in the PR's own "Commits" tab and would be a duplicate. Do not append such a section even when the template lacks one.
            - For each template section, decide by reading the section heading and any placeholder/prompt text:
              - Section asks for a **description, summary, overview, goal, purpose, or context** → replace its body with `SUMMARY`.
@@ -164,7 +160,7 @@ All steps checked:
            ## Summary
            <spec Summary section verbatim>
            ```
-           No commit list, no changelog, no attribution footer is appended.
+           No commit list or changelog is appended.
 
      4. On `gh` success print the PR URL.
      5. On `gh` failure (not installed, not authenticated, etc.): keep the push, print the error verbatim, and print the equivalent manual command the user can run.
@@ -211,4 +207,4 @@ When such information is genuinely needed to explain a change, generalise it: "t
 
 - Subjects use the Conventional-Commits format from §6.2 — no spec_id, no step number, no internal references.
 - Bodies, when present, describe *what* the change does and *why*, in normal prose. They must not list the spec_id, step number, or any of the sensitive-information items above.
-- PR bodies follow §8.3 — no attribution, no commit list.
+- PR bodies follow §8.3 — no commit list.
