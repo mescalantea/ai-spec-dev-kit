@@ -188,7 +188,7 @@ Real work isn't linear. The commands are designed for re-entry:
 
 ### Commit style
 
-`/spec-build` commits each step individually with a message like `<spec_id>: step N - <short description>`. Commit messages and PR bodies are not compressed — your repo's conventions (including any `Co-Authored-By` footer) are preserved.
+`/spec-build` commits each step individually with a Conventional-Commits subject — `<type>: <short description>` (e.g. `feat: …`, `fix: …`), where `<type>` is derived from the spec's `spec_type`. Subjects never contain the spec_id, step number, or other sensitive identifiers. Commit attribution (the `Co-Authored-By: Claude` trailer) is left to Claude Code's own configuration; SDD neither forces nor suppresses it. PR bodies never include a commit list — the PR's own "Commits" tab is the canonical record.
 
 ---
 
