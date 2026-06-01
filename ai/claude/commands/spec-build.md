@@ -68,9 +68,11 @@ Type any feedback to request changes before committing.
 ### 6. Commit and mark done
 
 1. `git add -A`
-2. Commit: `<spec_id>: step N - <short step description>`
-   - If `CLAUDE_ATTRIBUTION` is `true`: include a `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` trailer in the commit message body.
-   - If `CLAUDE_ATTRIBUTION` is `false`: do **not** append any `Co-Authored-By` trailer. Pass the full commit message explicitly and do not add attribution.
+2. Commit subject: `<type>: <short description of the change>`
+   - `<type>` is a Conventional-Commits prefix (no scope). Derive it from the spec's frontmatter `spec_type` via this mapping: `feature`→`feat`, `bugfix`→`fix`, `refactor`→`refactor`, `chore`→`chore`, `docs`→`docs`, `experiment`→`experiment`, `hotfix`→`fix`, `release`→`chore`, `support`→`chore`. When the step's actual change clearly belongs to a different category (e.g., a `feature`-typed spec whose step is a pure typo fix), pick the type that matches the change instead.
+   - The subject must NOT contain the spec_id, the step number, internal ticket numbers, customer information, credentials, API keys, internal URLs, or external system names. See `## Coding Standards` below.
+   - If `CLAUDE_ATTRIBUTION` is `true`: defer to Claude Code's built-in attribution. Do not write an explicit `Co-Authored-By` trailer in the commit message — the harness adds one automatically with the current model.
+   - If `CLAUDE_ATTRIBUTION` is `false`: explicitly suppress attribution. The commit message body must not contain any `Co-Authored-By` trailer, model identifier, or `🤖 Generated with Claude Code` line. Pass the full commit message explicitly so the harness cannot append its default trailer.
 3. Update spec: change `- [ ] Step N:` to `- [x] Step N:` for the completed step.
 4. If `TRACK_SPECS` is `true`: `git add .sdd/specs/<spec_id>.md && git commit --amend --no-edit`
    If `TRACK_SPECS` is `false`: skip — the checkbox update lives on disk only.
@@ -89,7 +91,7 @@ Runs once, after all steps are checked, **only if at least one step was committe
 3. If no CLAUDE.md-worthy changes were introduced → skip entirely (do not create a no-op commit).
 4. Otherwise:
    - Edit `CLAUDE.md` to reflect the new facts (new commands, changed invariants, updated tail behaviors, etc.).
-   - Commit: `<spec_id>: update CLAUDE.md with new behaviors`
+   - Commit subject: `docs: <short description of what was documented>` — same Conventional-Commits format and same attribution rules as §6.2. No spec_id, no step number.
 5. Then proceed to §8.
 
 ### 8. Completion
@@ -127,35 +129,28 @@ All steps checked:
            5. `PULL_REQUEST_TEMPLATE.md` (repo root)
            6. `pull_request_template.md` (repo root)
 
-        **b. Template found → fill it.**
+        **b. Template found → it is authoritative.** Honor the repo's PR/MR template structure verbatim; do not introduce headings or sections that the template does not define.
            - Parse the template into sections (split on markdown headings `## …` / `### …`). Any content before the first heading is the *preamble*.
            - **Preamble handling**: If the preamble contains explicit removal instructions (e.g., "remove before submitting", ✂ markers, or similar prompts directed at the PR author), strip the entire preamble. Otherwise preserve it, including any HTML comments (`<!-- … -->`).
            - Prepare spec data:
              - `SUMMARY` = spec `## Summary` section body (verbatim).
              - `IMPLEMENTATION` = spec `## Analysis` section body + the step descriptions from `## Implementation Plan` (without checkboxes/status markup). If `## Analysis` is absent, use only the plan steps.
-             - `COMMITS` = output of `git log origin/main..<branch> --oneline`.
-             - `ATTRIBUTION` = `🤖 Generated with [Claude Code](https://claude.com/claude-code)` (omit entirely when `CLAUDE_ATTRIBUTION` is `false`).
+           - PR bodies must not contain any Claude attribution — no `Co-Authored-By` line, no `🤖 Generated with Claude Code` footer, no model identifier, no "Generated with" mention. This rule is unconditional and does not depend on `CLAUDE_ATTRIBUTION` (that flag governs commit messages only).
+           - PR bodies must not include a commit list, changelog, or `## Commits` section. The commit list is already visible in the PR's own "Commits" tab and would be a duplicate. Do not append such a section even when the template lacks one.
            - For each template section, decide by reading the section heading and any placeholder/prompt text:
              - Section asks for a **description, summary, overview, goal, purpose, or context** → replace its body with `SUMMARY`.
              - Section asks for **implementation, approach, or how something is done** → replace its body with `IMPLEMENTATION`.
-             - Section asks for **changes, changelog, or what changed** → replace its body with `COMMITS`.
+             - Section asks for **changes, changelog, or what changed** → replace its body with `IMPLEMENTATION` (the step descriptions describe what changed without duplicating the commit list).
              - Section asks for **references, links, or related issues** → fill sub-items that can be derived from spec data and remove sub-items that cannot be filled. If no sub-items can be filled, remove the entire section.
              - Section cannot be filled **but its placeholder text suggests a default value** (e.g., "just write 'Standard deployment'") → keep the section and replace its body with that default.
              - Section cannot be filled and has no suggested default (e.g., "Screenshots", "Testing checklist") → remove the section entirely (heading + body).
-           - If no template section naturally received `COMMITS`, append a `## Commits` section containing the commit list at the end of the body (before attribution).
-           - Append `ATTRIBUTION` (if non-empty) as the last line of the body.
 
         **c. No template found → use default format.**
            ```
            ## Summary
            <spec Summary section verbatim>
-
-           ## Commits
-           <output of: git log origin/main..<branch> --oneline>
-
-           🤖 Generated with [Claude Code](https://claude.com/claude-code)
            ```
-           If `CLAUDE_ATTRIBUTION` is `false`, omit the `🤖 Generated with [Claude Code](https://claude.com/claude-code)` line.
+           No commit list, no changelog, no attribution footer is appended.
 
      4. On `gh` success print the PR URL.
      5. On `gh` failure (not installed, not authenticated, etc.): keep the push, print the error verbatim, and print the equivalent manual command the user can run.
