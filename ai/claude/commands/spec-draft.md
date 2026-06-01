@@ -90,11 +90,9 @@ If `TRACK_SPECS` is `true`:
 ```
 git add .sdd/specs/<spec_id>.md
 git commit -m "<type>: refresh spec"
-# subject above; if a Co-Authored-By trailer is expected, add it yourself at the
-# end of the message — don't assume it is appended automatically, don't force a bare subject
 ```
 
-`<type>` is a Conventional-Commits prefix. Default to `docs` (a spec refresh is documentation work); pick a different prefix when the refresh content clearly belongs elsewhere. The subject must not contain the spec_id, the step number, internal ticket numbers, customer information, credentials, or any other sensitive identifier. As in `/spec-build` §6.2, the message may carry an extended body; SDD neither forces nor suppresses the `Co-Authored-By` trailer, and does not append it automatically — if expected, include it yourself at the end of the message. Do not constrain the commit to a bare single-line subject.
+`<type>` is a Conventional-Commits prefix. Default to `docs` (a spec refresh is documentation work); pick a different prefix when the refresh content clearly belongs elsewhere. The subject must not contain the spec_id, the step number, internal ticket numbers, customer information, credentials, or any other sensitive identifier. As in `/spec-build` §6.2, the message may carry an extended body; do not constrain the commit to a bare single-line subject.
 
 If `TRACK_SPECS` is `false`: skip — the spec update lives on disk only.
 
