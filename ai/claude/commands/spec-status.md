@@ -22,7 +22,7 @@ User input: $ARGUMENTS
 - Single: read `.sdd/specs/<spec_id>.md`. Missing → print:
   ```
   No spec found at .sdd/specs/<spec_id>.md
-  Run: /spec-draft <spec_id> <type> <title>
+  Run: /spec-plan <spec_id> <description>
   ```
   and stop.
 - List: glob `.sdd/specs/*.md`, exclude `.sdd/specs/template/` and `.sdd/specs/.cache/`.

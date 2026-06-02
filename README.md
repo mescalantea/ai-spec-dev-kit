@@ -17,7 +17,7 @@ The toolkit enforces the split by shipping four distinct slash commands, one per
 ## 📦 What's included
 
 - **Spec template** — Markdown template with YAML frontmatter (`.sdd/specs/template/spec.md`). Covers Context, Summary, Functional Requirements, Non-Goals, Edge Cases, Acceptance Criteria, Open Questions, Dependencies, Success Metrics, Testing Guidelines.
-- **Four slash commands** for Claude Code — `/spec-draft`, `/spec-plan`, `/spec-build`, `/spec-status`.
+- **Three slash commands** for Claude Code — `/spec-plan`, `/spec-build`, `/spec-status`.
 - **`sdd publish`** — pure-bash command that pushes a local spec to its configured external source (Jira via `acli` + ADF; YouTrack via REST API + markdown). Lives outside Claude's context — zero tokens on the happy path.
 - **`sdd` CLI** (`scripts/sdd.sh`) — global facade with subcommands: `init`, `upgrade`, `version`, `publish`, `uninstall`, `help`.
 - **Setup wizard** (`scripts/setup.sh`) — POSIX bash, macOS + Linux. Copies commands, template, and generates `.sdd/config.json` (records the toolkit version). Invoked via `sdd init`.
@@ -159,10 +159,9 @@ When `sdd_version` is missing (older config), it falls back to the generic tip:
 All commands are invoked inside Claude Code:
 
 ```
-/spec-draft  <SPEC-ID> <type> <title>   # create or refresh a spec + branch
-/spec-plan   <SPEC-ID> [changes]        # produce/refresh the implementation plan
-/spec-build  <SPEC-ID>                  # walk the plan step by step
-/spec-status [SPEC-ID]                  # dashboard: phase + next command
+/spec-plan   <SPEC-ID> [type title | description | changes]   # create/plan/modify a spec
+/spec-build  <SPEC-ID>                                        # walk the plan step by step
+/spec-status [SPEC-ID]                                        # dashboard: phase + next command
 ```
 
 `<type>` is one of `feature`, `bugfix`, `refactor`, `chore`, `docs`, `experiment`, `hotfix`, `release`, `support`.
@@ -170,19 +169,17 @@ All commands are invoked inside Claude Code:
 ### The happy path
 
 ```
-/spec-draft PAR-224 bugfix Same Value Min Max Validation
-/spec-plan  PAR-224
+/spec-plan  PAR-224 bugfix Same Value Min Max Validation
 /spec-build PAR-224
 ```
 
-`/spec-draft` asks whether to create a new branch (default Yes; press `n` to stay on the current branch), then writes an empty-template `.sdd/specs/PAR-224.md` for you to fill. `/spec-plan` analyzes the codebase, asks you to resolve open questions, and appends an Implementation Plan. `/spec-build` walks the plan step by step, pausing after each so you can review before it commits. To sync the spec to Jira, run `sdd publish PAR-224` separately when you're ready.
+On a spec that doesn't exist yet, `/spec-plan` creates it: it asks whether to create a new branch (default Yes; press `n` to stay on the current branch), writes `.sdd/specs/PAR-224.md` filled from your description (prompting for the type or issue id if they aren't clear), then in the same run analyzes the codebase, asks you to resolve open questions, and appends an Implementation Plan. Re-run it on an existing spec to modify the plan. `/spec-build` walks the plan step by step, pausing after each so you can review before it commits. To sync the spec to Jira, run `sdd publish PAR-224` separately when you're ready.
 
 ### Non-linear iteration
 
 Real work isn't linear. The commands are designed for re-entry:
 
-- **Refresh the spec** — run `/spec-draft <id> ...` again on an existing spec. The branch prompt is skipped, the body template is rewritten, and local-only sections (`Clarifications`, `Analysis`, `Implementation Plan`) are preserved.
-- **Re-plan after feedback** — run `/spec-plan <id> <what changed and why>`. The `changes` argument is **required** on re-runs. Checked steps still valid are kept; **invalidated steps are deleted outright** (numbering never renumbers — gaps are intentional and indicate where superseded work used to live). The reason for each deletion is recorded as one of ≤3 Clarifications bullets per re-run. New work is appended continuing the step numbering.
+- **Re-plan after feedback** — run `/spec-plan <id> <what changed and why>` on an existing spec. The `changes` argument is **required** when a plan already exists. Checked steps still valid are kept; **invalidated steps are deleted outright** (numbering never renumbers — gaps are intentional and indicate where superseded work used to live). The reason for each deletion is recorded as one of ≤3 Clarifications bullets per re-run. New work is appended continuing the step numbering. When the change revises requirements rather than just the plan, the product sections are amended in place while `Clarifications` / `Analysis` / `Implementation Plan` are preserved.
 - **Resume a build** — `/spec-build <id>` always picks up at the next unchecked step, including after a re-plan.
 - **Check where you are** — `/spec-status <id>` (or no ID for a table of all specs) shows the current phase (`drafted` / `planned` / `building` / `done`), progress counts, and the next command to run.
 
@@ -242,7 +239,7 @@ Jira Cloud's description field is **ADF-only** (Atlassian Document Format — st
 .
 ├── ai/
 │   └── claude/
-│       ├── commands/           # /spec-draft, /spec-plan, /spec-build, /spec-status
+│       ├── commands/           # /spec-plan, /spec-build, /spec-status
 │       └── skills/             # (none ship today)
 ├── templates/
 │   └── spec.md                 # Spec template with YAML frontmatter
@@ -263,7 +260,7 @@ Layout inside a target project after running the wizard:
 ```
 your-project/
 ├── .claude/
-│   └── commands/               # spec-draft, spec-plan, spec-build, spec-status
+│   └── commands/               # spec-plan, spec-build, spec-status
 └── .sdd/
     ├── config.json             # Wizard-generated config (sdd_version, source, etc.)
     └── specs/
