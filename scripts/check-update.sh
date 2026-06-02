@@ -17,8 +17,8 @@ COOLDOWN_FILE="$HOME/.sdd/.last_update_check"
 COOLDOWN_SECONDS=86400
 
 _check_update() {
-  # Only act inside a project that uses the toolkit; stay silent elsewhere.
-  [ -d "$PWD/.sdd" ] || return 0
+  # Only act inside a project initialised by the toolkit; stay silent elsewhere.
+  [ -f "$PWD/.sdd/config.json" ] || return 0
 
   # Cooldown: skip if checked within 24 hours.
   if [ -f "$COOLDOWN_FILE" ]; then
