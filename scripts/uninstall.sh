@@ -143,7 +143,7 @@ cat <<EOF
 SDD Toolkit uninstalled.
 
 Project directories (.claude/, .sdd/) were not touched.
-To remove SDD from a project, delete .claude/commands/spec-*.md,
-.claude/skills/spec-*/, and .sdd/ manually.
+To remove SDD from a project, delete .claude/commands/spec-*.md
+and .sdd/ manually, then drop the SDD globs from .git/info/exclude.
 ────────────────────────────────────────────────────
 EOF
