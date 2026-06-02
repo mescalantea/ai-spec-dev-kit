@@ -302,8 +302,7 @@ Track specs in git: $TRACK_SPECS
 Source:             $SELECTED_SOURCE
 
 Commands available in Claude Code:
-  /spec-draft  <SPEC-ID> <type> <title>
-  /spec-plan   <SPEC-ID> [changes]
+  /spec-plan   <SPEC-ID> [type title | description | changes]
   /spec-build  <SPEC-ID>
   /spec-status [SPEC-ID]
 
