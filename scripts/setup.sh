@@ -227,7 +227,10 @@ if [ -d "$SRC_SKILLS" ] && ls "$SRC_SKILLS"/spec-* >/dev/null 2>&1; then
   copy_dir_contents "$SRC_SKILLS" "$DST_SKILLS"
 fi
 
-# Spec template.
+# Spec template. The dir is entirely SDD-owned, so clear it first to drop any
+# template files an older toolkit shipped, then re-populate from the current one.
+rm -rf "$DST_TEMPLATE_DIR"
+mkdir -p "$DST_TEMPLATE_DIR"
 cp "$SRC_TEMPLATE" "$DST_TEMPLATE_DIR/spec.md"
 echo "  wrote $DST_TEMPLATE_DIR/spec.md"
 
