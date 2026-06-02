@@ -305,16 +305,28 @@ if git -C "$TARGET_DIR" rev-parse --git-dir >/dev/null 2>&1; then
   mkdir -p "$(dirname "$EXCLUDE_FILE")"
 fi
 
-# Always-ignore: SDD-specific paths under .claude/ + the publish cache.
-# Scoped globs only — leave the user's own .claude/ content alone.
-ensure_gitignore_line ".claude/commands/spec-*.md"
-ensure_gitignore_line ".claude/skills/spec-*/"
-ensure_gitignore_line ".sdd/specs/.cache/"
+# SDD's ignore globs live in the clone-local exclude file, never the committed
+# .gitignore. Scoped globs only — leave the user's own .claude/ content alone.
+# On each run we also migrate any tool-owned globs (including the retired
+# skills glob) off of a .gitignore left behind by an earlier toolkit version.
+if [ "$IS_GIT_REPO" = "true" ]; then
+  for glob in \
+    ".claude/commands/spec-*.md" \
+    ".claude/skills/spec-*/" \
+    ".sdd/specs/.cache/" \
+    ".sdd/"; do
+    remove_gitignore_line "$glob"
+  done
 
-if [ "$TRACK_SPECS" = "false" ]; then
-  ensure_gitignore_line ".sdd/"
+  ensure_exclude_line ".claude/commands/spec-*.md"
+  ensure_exclude_line ".sdd/specs/.cache/"
+  if [ "$TRACK_SPECS" = "false" ]; then
+    ensure_exclude_line ".sdd/"
+  fi
+  echo "  updated $EXCLUDE_FILE"
+else
+  echo "  not a git repository — skipped writing ignore rules (no .git/info/exclude)"
 fi
-echo "  updated $DST_GITIGNORE"
 
 # ---------------------------------------------------------------------------
 # Summary.
