@@ -164,7 +164,7 @@ This will:
   • create .sdd/ with config.json (records the toolkit version)
   • copy the spec template into .sdd/specs/template/
   • create .sdd/specs/.cache/ for publish state
-  • always gitignore .claude/commands/spec-*.md, .claude/skills/spec-*/, .sdd/specs/.cache/
+  • add SDD's ignore globs to the local git exclude (.git/info/exclude, not committed): .claude/commands/spec-*.md, .sdd/specs/.cache/
   • ask whether to track .sdd/ specs in git
 
 Existing files will be overwritten.
