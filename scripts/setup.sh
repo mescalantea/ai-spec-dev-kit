@@ -277,6 +277,22 @@ except Exception:
     print("local")
 ' "$DST_CONFIG")"
 
+# Resolve the clone-local git exclude file. SDD's ignore globs are tool-local,
+# so they belong in .git/info/exclude (per-clone, uncommitted) rather than the
+# project's committed .gitignore. rev-parse handles worktrees / separate git
+# dirs; a relative result is resolved against the target.
+IS_GIT_REPO=false
+EXCLUDE_FILE=""
+if git -C "$TARGET_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  IS_GIT_REPO=true
+  EXCLUDE_FILE="$(git -C "$TARGET_DIR" rev-parse --git-path info/exclude)"
+  case "$EXCLUDE_FILE" in
+    /*) ;;
+    *)  EXCLUDE_FILE="$TARGET_DIR/$EXCLUDE_FILE" ;;
+  esac
+  mkdir -p "$(dirname "$EXCLUDE_FILE")"
+fi
+
 # Always-ignore: SDD-specific paths under .claude/ + the publish cache.
 # Scoped globs only — leave the user's own .claude/ content alone.
 ensure_gitignore_line ".claude/commands/spec-*.md"
