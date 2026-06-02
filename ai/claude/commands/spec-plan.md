@@ -47,7 +47,7 @@ From `spec_id`, `rest`, and any issue id / URL in the input, infer:
 
 Derive `branch_name` = `<spec_type>/<spec_id>-<Title-Case-Words-Joined-By-Dashes>`.
 
-If `spec_type`, `spec_title`, or `spec_id` cannot be inferred from the input, **ask the user — do not guess.**
+If `spec_type`, `spec_title`, or `spec_id` cannot be inferred from the input, **ask the user via the `AskUserQuestion` tool — do not guess.** Offer the candidate `spec_type` values as selectable options; free-form values (a title) come through the tool's automatic `Other` affordance.
 
 #### 3.2 Dirty tree check
 
@@ -108,19 +108,12 @@ Document anything that could go wrong:
 
 ### 6. Ask user
 
-Present:
+Gather the user's answers through the `AskUserQuestion` tool — the same selectable-option mechanism `/spec-build` uses for its prompts — not a free-form text prompt. Surface:
 1. Open questions from the spec (if unanswered).
-2. Technical decisions with multiple valid approaches — describe options, ask user to choose.
+2. Technical decisions with multiple valid approaches.
 3. Risks needing user input.
 
-**Option suggestions:** For each open question or decision where options can be reasonably inferred, propose 2–4 candidate answers and mark one as the default. Use this format:
-
-```
-Q: <question text>
-  ★ (a) <option> — <one-line reason>  ← default
-    (b) <option> — <one-line reason>
-    (c) <option> — <one-line reason>
-```
+Batch them into one or more `AskUserQuestion` calls (the tool takes 1–4 questions per call). For each question, infer 2–4 candidate answers and present them as options, listing the recommended candidate **first** with `(Recommended)` appended to its `label` and the one-line reason in its `description`. The tool automatically offers an `Other` affordance, so the user can always type a free-form answer.
 
 Infer options using this source-of-truth order:
 1. Spec body (existing constraints or examples).
@@ -128,9 +121,9 @@ Infer options using this source-of-truth order:
 3. Prior specs / `CLAUDE.md` (established conventions).
 4. Generic defaults (common industry practice).
 
-When no options are reasonably inferable from any of the above, ask the question open-ended without fabricated options.
+When a question has no reasonably inferable options, ask it open-ended in plain text instead (the tool requires at least two options) and wait for the answer the same way.
 
-**STOP and wait for answers.** Do not proceed until user responds.
+**STOP and wait for answers.** Do not proceed until the user responds.
 
 ### 7. Write/refresh spec sections
 
