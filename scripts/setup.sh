@@ -201,7 +201,13 @@ echo "Installing..."
 
 mkdir -p "$DST_COMMANDS" "$DST_SKILLS" "$DST_SDD" "$DST_TEMPLATE_DIR" "$DST_CACHE_DIR"
 
-# Commands (flat .md files).
+# Commands (flat .md files). Clear stale spec-* commands first so any the
+# toolkit no longer ships don't linger after an upgrade. Scoped glob only —
+# the user's own .claude/commands/ files are untouched.
+for f in "$DST_COMMANDS"/spec-*.md; do
+  [ -e "$f" ] || continue
+  rm -f "$f"
+done
 for f in "$SRC_COMMANDS"/*.md; do
   [ -e "$f" ] || continue
   cp "$f" "$DST_COMMANDS/"
