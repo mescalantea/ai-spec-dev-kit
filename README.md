@@ -107,7 +107,7 @@ The wizard:
 - creates `.sdd/` with `config.json` (records the toolkit short SHA in `sdd_version`)
 - copies the spec template into `.sdd/specs/template/spec.md`
 - creates `.sdd/specs/.cache/` for publish state
-- always gitignores the SDD-specific globs `.claude/commands/spec-*.md`, `.claude/skills/spec-*/`, and `.sdd/specs/.cache/` — your own commands/skills under `.claude/` are left alone
+- adds the SDD-specific globs `.claude/commands/spec-*.md` and `.sdd/specs/.cache/` to the clone-local git exclude file (`.git/info/exclude`), not the committed `.gitignore` — the toolkit is project-local and leaves your tracked files and your own `.claude/` content alone (re-running migrates any of these globs left in an older `.gitignore`; outside a git repo this step is skipped)
 - asks whether to track `.sdd/` specs in git (default Yes)
 - asks whether to include Claude as a co-author in commits (default Yes)
 
@@ -274,7 +274,7 @@ your-project/
 ## 🔄 Updating / reinitializing
 
 - **Toolkit update** — run `sdd upgrade`, then `sdd init` in each target project. Existing commands and template are overwritten; your specs and the rest of `config.json` are not (only `sdd_version` is rewritten).
-- **Reset a single project** — delete `.claude/commands/spec-*.md`, `.claude/skills/spec-*/`, `.sdd/`, then re-run `sdd init`.
+- **Reset a single project** — delete `.claude/commands/spec-*.md`, `.sdd/`, then re-run `sdd init`.
 - **Move off the toolkit** — `.sdd/specs/` is just Markdown; it keeps working without the commands.
 - **Legacy `.specs/` directory** — if you have spec files from an older install under `.specs/`, the wizard leaves them untouched. Move them to `.sdd/specs/` manually after reinitializing.
 
