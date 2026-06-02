@@ -105,19 +105,31 @@ prompt_yn() {
   done
 }
 
-ensure_gitignore_line() {
+ensure_exclude_line() {
   line="$1"
-  if [ ! -f "$DST_GITIGNORE" ]; then
-    printf '%s\n' "$line" > "$DST_GITIGNORE"
+  if [ ! -f "$EXCLUDE_FILE" ]; then
+    printf '%s\n' "$line" > "$EXCLUDE_FILE"
     return
   fi
-  if ! grep -Fxq "$line" "$DST_GITIGNORE"; then
+  if ! grep -Fxq "$line" "$EXCLUDE_FILE"; then
     # Guard: if file is non-empty and last byte is not \n, add one.
     # tail -c 1 | wc -l returns 1 when last byte is \n, 0 for any other byte.
-    if [ -s "$DST_GITIGNORE" ] && [ "$(tail -c 1 "$DST_GITIGNORE" | wc -l)" -eq 0 ]; then
-      printf '\n' >> "$DST_GITIGNORE"
+    if [ -s "$EXCLUDE_FILE" ] && [ "$(tail -c 1 "$EXCLUDE_FILE" | wc -l)" -eq 0 ]; then
+      printf '\n' >> "$EXCLUDE_FILE"
     fi
-    printf '%s\n' "$line" >> "$DST_GITIGNORE"
+    printf '%s\n' "$line" >> "$EXCLUDE_FILE"
+  fi
+}
+
+# Strip a glob SDD owns from the project's committed .gitignore (migration off
+# of .gitignore onto info/exclude). No-op when .gitignore is absent or the line
+# is not present. grep -Fxv keeps every line but exact matches of $line.
+remove_gitignore_line() {
+  line="$1"
+  [ -f "$DST_GITIGNORE" ] || return 0
+  if grep -Fxq "$line" "$DST_GITIGNORE"; then
+    grep -Fxv "$line" "$DST_GITIGNORE" > "$DST_GITIGNORE.tmp" || true
+    mv "$DST_GITIGNORE.tmp" "$DST_GITIGNORE"
   fi
 }
 
