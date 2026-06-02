@@ -105,19 +105,31 @@ prompt_yn() {
   done
 }
 
-ensure_gitignore_line() {
+ensure_exclude_line() {
   line="$1"
-  if [ ! -f "$DST_GITIGNORE" ]; then
-    printf '%s\n' "$line" > "$DST_GITIGNORE"
+  if [ ! -f "$EXCLUDE_FILE" ]; then
+    printf '%s\n' "$line" > "$EXCLUDE_FILE"
     return
   fi
-  if ! grep -Fxq "$line" "$DST_GITIGNORE"; then
+  if ! grep -Fxq "$line" "$EXCLUDE_FILE"; then
     # Guard: if file is non-empty and last byte is not \n, add one.
     # tail -c 1 | wc -l returns 1 when last byte is \n, 0 for any other byte.
-    if [ -s "$DST_GITIGNORE" ] && [ "$(tail -c 1 "$DST_GITIGNORE" | wc -l)" -eq 0 ]; then
-      printf '\n' >> "$DST_GITIGNORE"
+    if [ -s "$EXCLUDE_FILE" ] && [ "$(tail -c 1 "$EXCLUDE_FILE" | wc -l)" -eq 0 ]; then
+      printf '\n' >> "$EXCLUDE_FILE"
     fi
-    printf '%s\n' "$line" >> "$DST_GITIGNORE"
+    printf '%s\n' "$line" >> "$EXCLUDE_FILE"
+  fi
+}
+
+# Strip a glob SDD owns from the project's committed .gitignore (migration off
+# of .gitignore onto info/exclude). No-op when .gitignore is absent or the line
+# is not present. grep -Fxv keeps every line but exact matches of $line.
+remove_gitignore_line() {
+  line="$1"
+  [ -f "$DST_GITIGNORE" ] || return 0
+  if grep -Fxq "$line" "$DST_GITIGNORE"; then
+    grep -Fxv "$line" "$DST_GITIGNORE" > "$DST_GITIGNORE.tmp" || true
+    mv "$DST_GITIGNORE.tmp" "$DST_GITIGNORE"
   fi
 }
 
@@ -152,7 +164,7 @@ This will:
   • create .sdd/ with config.json (records the toolkit version)
   • copy the spec template into .sdd/specs/template/
   • create .sdd/specs/.cache/ for publish state
-  • always gitignore .claude/commands/spec-*.md, .claude/skills/spec-*/, .sdd/specs/.cache/
+  • add SDD's ignore globs to the local git exclude (.git/info/exclude, not committed): .claude/commands/spec-*.md, .sdd/specs/.cache/
   • ask whether to track .sdd/ specs in git
 
 Existing files will be overwritten.
@@ -189,20 +201,36 @@ echo "Installing..."
 
 mkdir -p "$DST_COMMANDS" "$DST_SKILLS" "$DST_SDD" "$DST_TEMPLATE_DIR" "$DST_CACHE_DIR"
 
-# Commands (flat .md files).
+# Commands (flat .md files). Clear stale spec-* commands first so any the
+# toolkit no longer ships don't linger after an upgrade. Scoped glob only —
+# the user's own .claude/commands/ files are untouched.
+for f in "$DST_COMMANDS"/spec-*.md; do
+  [ -e "$f" ] || continue
+  rm -f "$f"
+done
 for f in "$SRC_COMMANDS"/*.md; do
   [ -e "$f" ] || continue
   cp "$f" "$DST_COMMANDS/"
   echo "  wrote $DST_COMMANDS/$(basename "$f")"
 done
 
-# Skills (nested directories). Only copy if any exist; the toolkit may ship without
-# any spec-* skills now that caveman/source have been removed.
+# Skills (nested directories). Clear stale spec-* skill dirs first — this runs
+# even when the toolkit ships no skills, which is exactly when a previously
+# installed spec-* skill must be removed. Scoped glob only.
+for d in "$DST_SKILLS"/spec-*; do
+  [ -e "$d" ] || continue
+  rm -rf "$d"
+done
+# Only copy if any exist; the toolkit may ship without any spec-* skills now
+# that caveman/source have been removed.
 if [ -d "$SRC_SKILLS" ] && ls "$SRC_SKILLS"/spec-* >/dev/null 2>&1; then
   copy_dir_contents "$SRC_SKILLS" "$DST_SKILLS"
 fi
 
-# Spec template.
+# Spec template. The dir is entirely SDD-owned, so clear it first to drop any
+# template files an older toolkit shipped, then re-populate from the current one.
+rm -rf "$DST_TEMPLATE_DIR"
+mkdir -p "$DST_TEMPLATE_DIR"
 cp "$SRC_TEMPLATE" "$DST_TEMPLATE_DIR/spec.md"
 echo "  wrote $DST_TEMPLATE_DIR/spec.md"
 
@@ -277,16 +305,44 @@ except Exception:
     print("local")
 ' "$DST_CONFIG")"
 
-# Always-ignore: SDD-specific paths under .claude/ + the publish cache.
-# Scoped globs only — leave the user's own .claude/ content alone.
-ensure_gitignore_line ".claude/commands/spec-*.md"
-ensure_gitignore_line ".claude/skills/spec-*/"
-ensure_gitignore_line ".sdd/specs/.cache/"
-
-if [ "$TRACK_SPECS" = "false" ]; then
-  ensure_gitignore_line ".sdd/"
+# Resolve the clone-local git exclude file. SDD's ignore globs are tool-local,
+# so they belong in .git/info/exclude (per-clone, uncommitted) rather than the
+# project's committed .gitignore. rev-parse handles worktrees / separate git
+# dirs; a relative result is resolved against the target.
+IS_GIT_REPO=false
+EXCLUDE_FILE=""
+if git -C "$TARGET_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  IS_GIT_REPO=true
+  EXCLUDE_FILE="$(git -C "$TARGET_DIR" rev-parse --git-path info/exclude)"
+  case "$EXCLUDE_FILE" in
+    /*) ;;
+    *)  EXCLUDE_FILE="$TARGET_DIR/$EXCLUDE_FILE" ;;
+  esac
+  mkdir -p "$(dirname "$EXCLUDE_FILE")"
 fi
-echo "  updated $DST_GITIGNORE"
+
+# SDD's ignore globs live in the clone-local exclude file, never the committed
+# .gitignore. Scoped globs only — leave the user's own .claude/ content alone.
+# On each run we also migrate any tool-owned globs (including the retired
+# skills glob) off of a .gitignore left behind by an earlier toolkit version.
+if [ "$IS_GIT_REPO" = "true" ]; then
+  for glob in \
+    ".claude/commands/spec-*.md" \
+    ".claude/skills/spec-*/" \
+    ".sdd/specs/.cache/" \
+    ".sdd/"; do
+    remove_gitignore_line "$glob"
+  done
+
+  ensure_exclude_line ".claude/commands/spec-*.md"
+  ensure_exclude_line ".sdd/specs/.cache/"
+  if [ "$TRACK_SPECS" = "false" ]; then
+    ensure_exclude_line ".sdd/"
+  fi
+  echo "  updated $EXCLUDE_FILE"
+else
+  echo "  not a git repository — skipped writing ignore rules (no .git/info/exclude)"
+fi
 
 # ---------------------------------------------------------------------------
 # Summary.
