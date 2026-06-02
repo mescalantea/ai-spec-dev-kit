@@ -214,8 +214,15 @@ for f in "$SRC_COMMANDS"/*.md; do
   echo "  wrote $DST_COMMANDS/$(basename "$f")"
 done
 
-# Skills (nested directories). Only copy if any exist; the toolkit may ship without
-# any spec-* skills now that caveman/source have been removed.
+# Skills (nested directories). Clear stale spec-* skill dirs first — this runs
+# even when the toolkit ships no skills, which is exactly when a previously
+# installed spec-* skill must be removed. Scoped glob only.
+for d in "$DST_SKILLS"/spec-*; do
+  [ -e "$d" ] || continue
+  rm -rf "$d"
+done
+# Only copy if any exist; the toolkit may ship without any spec-* skills now
+# that caveman/source have been removed.
 if [ -d "$SRC_SKILLS" ] && ls "$SRC_SKILLS"/spec-* >/dev/null 2>&1; then
   copy_dir_contents "$SRC_SKILLS" "$DST_SKILLS"
 fi
